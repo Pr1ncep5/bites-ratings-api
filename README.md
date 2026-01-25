@@ -126,8 +126,8 @@ flowchart TB
 1. **Clone the repository:**
 
 ```bash
-git clone https://github.com/Pr1ncep5/RedisProject.git
-cd RedisProject
+git clone https://github.com/Pr1ncep5/bites-ratings-api.git
+cd bites-ratings-api
 ```
 
 2. **Configure environment variables:**
