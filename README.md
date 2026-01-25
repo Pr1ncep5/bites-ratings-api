@@ -181,12 +181,16 @@ The API will be available at `http://localhost:3000`. RedisInsight UI is accessi
 
 ### Restaurant Details
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `POST` | `/restaurants/:id/details` | Add nested details (links, contacts) |
 | `GET` | `/restaurants/:id/details` | Get restaurant details |
 | `PUT` | `/restaurants/:id/details` | Update restaurant details |
 
 ### Reviews
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `POST` | `/restaurants/:id/reviews` | Add a review (recalculates average rating) |
 | `GET` | `/restaurants/:id/reviews` | List reviews (paginated) |
 | `PUT` | `/restaurants/:id/reviews/:reviewId` | Update a review (recalculates rating) |
@@ -194,10 +198,14 @@ The API will be available at `http://localhost:3000`. RedisInsight UI is accessi
 
 ### Weather
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/restaurants/:id/weather` | Get cached weather for restaurant location |
 
 ### Cuisines
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | `GET` | `/cuisines` | List all cuisines |
 | `GET` | `/cuisines/:cuisine` | List restaurants by cuisine |
 
