@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "bun --watch index.ts",
     "build": "tsc",
-    "start": "bun run dist/index.js"
+    "start": "bun run dist/index.js",
+    "search:index": "bun src/seed/createIndex.ts",
+    "seed:bloom": "bun src/seed/bloomFilter.ts",
+    "setup": "bun run search:index && bun run seed:bloom"
   },
   "devDependencies": {
     "@types/bun": "latest",

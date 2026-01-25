@@ -1,5 +1,5 @@
-import { initializeRedisClient } from "../src/utils/client";
-import { restaurantsBloomKey } from "../src/utils/keys";
+import { initializeRedisClient } from "../utils/client";
+import { restaurantsBloomKey } from "../utils/keys";
 
 async function createBloomFilter() {
   const client = await initializeRedisClient();
