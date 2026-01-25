@@ -11,6 +11,7 @@
     "setup": "bun run search:index && bun run seed:bloom"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.17",
     "@types/bun": "latest",
     "@types/redis": "^4.0.11"
   },
@@ -19,6 +20,7 @@
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.4",
+    "better-auth": "^1.4.17",
     "hono": "^4.9.10",
     "nanoid": "^5.1.6",
     "redis": "^5.8.3",
