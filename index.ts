@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { createErrorResponse } from "./src/utils/responses";
 import restaurantsRouter from "./src/routes/restaurants";
 import cuisinesRouter from "./src/routes/cuisines";
+import adminRouter from "./src/routes/admin";
 import authRouter from "./src/routes/auth";
 import { type AuthType } from "./src/lib/auth";
 import { sessionMiddleware } from "./src/middlewares/authMiddleware";
@@ -18,6 +19,7 @@ app.use("*", sessionMiddleware);
 
 app.route("/restaurants", restaurantsRouter);
 app.route("/cuisines", cuisinesRouter);
+app.route("/admin", adminRouter);
 
 app.onError((err, c) => {
   console.error(`Application Error: ${err.message}`, err.stack);
