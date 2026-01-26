@@ -195,6 +195,7 @@ router.post(
       rating: data.rating,
       timestamp: Date.now(),
       restaurantId,
+      authorId: user!.id,
     };
 
     const [reviewCount, setResult, totalStarsString] = await Promise.all([
@@ -306,6 +307,14 @@ router.put(
 
     const client = await initializeRedisClient();
     const newData: Review = c.req.valid("json");
+
+    const existingReview = await client.hGetAll(reviewDetailsKey);
+    
+    if (existingReview.authorId && existingReview.authorId !== user!.id) {
+      if (user!.role !== "admin") {
+        return c.json(createErrorResponse("Forbidden - You can only edit your own reviews"), 403);
+      }
+    }
 
     const oldReviewData = await client.hGetAll(reviewDetailsKey);
     const oldRating = parseFloat(oldReviewData.rating || "0");
