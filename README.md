@@ -16,6 +16,7 @@ A high-performance RESTful API for restaurant management and review processing, 
 - [Motivation](#motivation)
 - [Architecture](#architecture)
 - [Key Features](#key-features)
+- [Authentication \& Security](#authentication--security)
 - [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
 - [API Reference](#api-reference)
@@ -23,7 +24,7 @@ A high-performance RESTful API for restaurant management and review processing, 
 
 ---
 
-## Motivation 
+## Motivation
 
 I decided to create this project to bridge the gap between theoretical university modules I have attended on data management and practical system engineering. Having developed a strong interest in caching mechanisms and process optimization during my studies, I built this API to explore and deepen my knowledge about:
 
@@ -42,46 +43,56 @@ flowchart TB
     subgraph client [Client]
         API[REST API Requests]
     end
-    
+
     subgraph app [Hono Application]
         Routes[Routes Layer]
+        AuthMW[Auth Middleware]
         MW[Middleware Layer]
         Valid[Zod Validation]
     end
-    
-    subgraph redis [Redis Stack]
-        Hash[Hashes - Restaurant/Review Data]
-        SSet[Sorted Sets - Leaderboard]
-        Sets[Sets - Cuisines]
-        List[Lists - Review IDs]
-        JSON[RedisJSON - Details]
-        Bloom[RedisBloom - Duplicates]
-        Search[RediSearch - Full Text]
+
+    subgraph auth [BetterAuth]
+        BA[Authentication Handler]
+        RBAC[RBAC Plugin]
     end
-    
+
+    subgraph storage [Data Layer]
+        subgraph redis [Redis Stack]
+            Hash[Hashes - Restaurant/Review Data]
+            SSet[Sorted Sets - Leaderboard]
+            Sessions[Sessions - secondaryStorage]
+            Bloom[RedisBloom - Duplicates]
+        end
+        SQLite[(SQLite - Users/Accounts)]
+    end
+
     subgraph external [External Services]
         Weather[OpenWeatherMap API]
     end
-    
+
     API --> Routes
-    Routes --> MW
+    Routes --> AuthMW
+    AuthMW --> BA
+    BA --> SQLite
+    BA --> Sessions
+    AuthMW --> MW
     MW --> Valid
     Valid --> redis
     Routes --> Weather
-    Weather -.->|cached| redis
+    Weather -.-> |cached| redis
 ```
 
 ### Redis Module Usage
 
-| Module | Purpose |
-|--------|---------|
-| **RediSearch** | Full-text indexing of `name` field with sortable `avgStars` |
-| **RedisBloom** | Duplicate prevention during restaurant creation (~0.01% error rate) |
-| **RedisJSON** | Atomic updates for nested restaurant details (links, contacts) |
-| **Sorted Sets** | Restaurant leaderboard with O(log N) ranking updates |
-| **Hashes** | Primary storage for restaurant and review entities |
-| **Sets** | Cuisine categorization and restaurant-cuisine relationships |
-| **Lists** | Ordered review IDs per restaurant for pagination |
+| Module          | Purpose                                                             |
+| --------------- | ------------------------------------------------------------------- |
+| **RediSearch**  | Full-text indexing of `name` field with sortable `avgStars`         |
+| **RedisBloom**  | Duplicate prevention during restaurant creation (~0.01% error rate) |
+| **RedisJSON**   | Atomic updates for nested restaurant details (links, contacts)      |
+| **Sorted Sets** | Restaurant leaderboard with O(log N) ranking updates                |
+| **Hashes**      | Primary storage for restaurant and review entities                  |
+| **Sets**        | Cuisine categorization and restaurant-cuisine relationships         |
+| **Lists**       | Ordered review IDs per restaurant for pagination                    |
 
 ---
 
@@ -97,16 +108,41 @@ flowchart TB
 
 ---
 
+## Authentication & Security
+
+I use [**BetterAuth**](https://www.better-auth.com/) - honestly, the best authentication library for TypeScript I've ever used. It was chosen for its smooth developer experience and seamless integration with Hono.
+
+### Password Security
+
+BetterAuth implements industry-standard password protection. It hashes passwords with a unique random value called "salt" and adds an additional layer of protection with its secret key (pepper) in case the database is compromised, e.g. to defend against rainbow table attacks.
+
+### Session Management with Redis
+
+Sessions are stored in **Redis** using [BetterAuth's secondaryStorage feature](https://www.better-auth.com/docs/concepts/database#secondary-storage). This allows rapid session storage and retrieval, without hitting the SQLite database. 
+
+### Role-Based Access Control (RBAC)
+
+The API uses the BetterAuth Admin plugin to enforce permissions for different roles:
+
+| Role    | Permissions                                                             |
+| ------- | ----------------------------------------------------------------------- |
+| `admin` | Full access: create/update/delete restaurants, manage users, audit logs |
+| `owner` | Update owned restaurants, manage reviews                                |
+| `user`  | Create and edit own reviews only                                        |
+
+---
+
 ## Technology Stack
 
-| Category | Technology |
-|----------|------------|
-| **Runtime** | Bun |
-| **Framework** | Hono |
-| **Database** | Redis Stack (RediSearch, RedisJSON, RedisBloom) |
-| **Validation** | Zod |
-| **Infrastructure** | Docker & Docker Compose |
-| **Language** | TypeScript |
+| Category             | Technology                    |
+| -------------------- | ----------------------------- |
+| **Runtime**          | Bun                           |
+| **Framework**        | Hono                          |
+| **Primary Database** | Redis Stack & SQLite for Auth |
+| **Authentication**   | BetterAuth                    |
+| **Validation**       | Zod                           |
+| **Infrastructure**   | Docker & Docker Compose       |
+| **Language**         | TypeScript                    |
 
 > **Why?** Because I like performance. Bun provides a significantly faster runtime with built-in TypeScript support than a traditional Node.js. Coupled with Hono the API has almost zero overhead, making it ideal for low-latency applications. I also used Zod for schema validation, ensuring Redis data remains consistent and type-safe.
 
@@ -135,7 +171,7 @@ cd bites-ratings-api
 
 ```bash
 cp .env.example .env
-# Edit .env and add your WEATHER_API_KEY
+# Edit .env and add your WEATHER_API_KEY and generate a secret key for BetterAuth
 ```
 
 3. **Spin up infrastructure:**
@@ -172,43 +208,43 @@ The API will be available at `http://localhost:3000`. RedisInsight UI is accessi
 
 ### Restaurants
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/restaurants` | List all restaurants (paginated, sorted by rating) |
-| `POST` | `/restaurants` | Create a new restaurant (Bloom filter protected) |
-| `GET` | `/restaurants/search?q={query}` | Full-text search by name |
-| `GET` | `/restaurants/:id` | Get restaurant by ID (increments view count) |
-| `PUT` | `/restaurants/:id` | Update restaurant (invalidates weather cache if location changes) |
+| Method | Endpoint                        | Description                                                       |
+| ------ | ------------------------------- | ----------------------------------------------------------------- |
+| `GET`  | `/restaurants`                  | List all restaurants (paginated, sorted by rating)                |
+| `POST` | `/restaurants`                  | Create a new restaurant (Bloom filter protected)                  |
+| `GET`  | `/restaurants/search?q={query}` | Full-text search by name                                          |
+| `GET`  | `/restaurants/:id`              | Get restaurant by ID (increments view count)                      |
+| `PUT`  | `/restaurants/:id`              | Update restaurant (invalidates weather cache if location changes) |
 
 ### Restaurant Details
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Method | Endpoint                   | Description                          |
+| ------ | -------------------------- | ------------------------------------ |
 | `POST` | `/restaurants/:id/details` | Add nested details (links, contacts) |
-| `GET` | `/restaurants/:id/details` | Get restaurant details |
-| `PUT` | `/restaurants/:id/details` | Update restaurant details |
+| `GET`  | `/restaurants/:id/details` | Get restaurant details               |
+| `PUT`  | `/restaurants/:id/details` | Update restaurant details            |
 
 ### Reviews
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/restaurants/:id/reviews` | Add a review (recalculates average rating) |
-| `GET` | `/restaurants/:id/reviews` | List reviews (paginated) |
-| `PUT` | `/restaurants/:id/reviews/:reviewId` | Update a review (recalculates rating) |
-| `DELETE` | `/restaurants/:id/reviews/:reviewId` | Delete a review |
+| Method   | Endpoint                             | Description                                |
+| -------- | ------------------------------------ | ------------------------------------------ |
+| `POST`   | `/restaurants/:id/reviews`           | Add a review (recalculates average rating) |
+| `GET`    | `/restaurants/:id/reviews`           | List reviews (paginated)                   |
+| `PUT`    | `/restaurants/:id/reviews/:reviewId` | Update a review (recalculates rating)      |
+| `DELETE` | `/restaurants/:id/reviews/:reviewId` | Delete a review                            |
 
 ### Weather
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/restaurants/:id/weather` | Get cached weather for restaurant location |
+| Method | Endpoint                   | Description                                |
+| ------ | -------------------------- | ------------------------------------------ |
+| `GET`  | `/restaurants/:id/weather` | Get cached weather for restaurant location |
 
 ### Cuisines
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/cuisines` | List all cuisines |
-| `GET` | `/cuisines/:cuisine` | List restaurants by cuisine |
+| Method | Endpoint             | Description                 |
+| ------ | -------------------- | --------------------------- |
+| `GET`  | `/cuisines`          | List all cuisines           |
+| `GET`  | `/cuisines/:cuisine` | List restaurants by cuisine |
 
 ---
 
