@@ -26,80 +26,80 @@ import {
 import { createErrorResponse, createSuccessResponse } from "../utils/responses";
 import { checkRestaurantExists } from "../middlewares/checkRestaurantId";
 import { checkReviewExists } from "../middlewares/checkReviewId";
+import { requireAuth, requireRole } from "../middlewares/authMiddleware";
+import type { AuthType } from "../lib/auth";
 
-const app = new Hono();
+const router = new Hono<{ Variables: AuthType }>();
 
-app.get("/", async (c) => {
+router.get("/", async (c) => {
   const client = await initializeRedisClient();
   const { page = 1, limit = 10 } = c.req.query();
 
   const start = (Number(page) - 1) * Number(limit);
   const end = start + Number(limit);
 
-  const restaurantIds = await client.zRange(
-    restaurantsByRatingKey,
-    start,
-    end,
-    {
-      REV: true,
-    }
-  );
+  const restaurantIds = await client.zRange(restaurantsByRatingKey, start, end, {
+    REV: true,
+  });
   const restaurants = await Promise.all(
-    restaurantIds.map((id) => client.hGetAll(restaurantKeyById(id)))
+    restaurantIds.map((id) => client.hGetAll(restaurantKeyById(id))),
   );
 
   const responseBody = createSuccessResponse(restaurants);
   return c.json(responseBody, 200);
 });
 
-app.post("/", zValidator("json", RestaurantSchema), async (c) => {
-  const validatedData: Restaurant = c.req.valid("json");
-  const client = await initializeRedisClient();
+router.post(
+  "/",
+  requireAuth,
+  requireRole("admin"),
+  zValidator("json", RestaurantSchema),
+  async (c) => {
+    const validatedData: Restaurant = c.req.valid("json");
+    const client = await initializeRedisClient();
 
-  const id = nanoid();
-  const restaurantKey = restaurantKeyById(id);
+    const id = nanoid();
+    const restaurantKey = restaurantKeyById(id);
 
-  const bloomString = `${validatedData.name}:${validatedData.location}`;
-  const hasSeenBefore = await client.bf.exists(
-    restaurantsBloomKey,
-    bloomString
-  );
+    const bloomString = `${validatedData.name}:${validatedData.location}`;
+    const hasSeenBefore = await client.bf.exists(restaurantsBloomKey, bloomString);
 
-  if (hasSeenBefore) {
-    return c.json(createErrorResponse("This restaurant already exists"), 409);
-  }
+    if (hasSeenBefore) {
+      return c.json(createErrorResponse("This restaurant already exists"), 409);
+    }
 
-  const hashData = {
-    id: id,
-    name: validatedData.name,
-    location: validatedData.location,
-  };
+    const hashData = {
+      id: id,
+      name: validatedData.name,
+      location: validatedData.location,
+    };
 
-  await Promise.all([
-    ...validatedData.cuisines.map((cuisine) =>
-      Promise.all([
-        client.sAdd(cuisinesKey, cuisine),
-        client.sAdd(cuisineKey(cuisine), id),
-        client.sAdd(restaurantCuisinesKeyById(id), cuisine),
-      ])
-    ),
-    client.hSet(restaurantKey, hashData),
-    client.zAdd(restaurantsByRatingKey, {
-      score: 0,
-      value: id,
-    }),
-    client.bf.add(restaurantsBloomKey, bloomString),
-  ]);
+    await Promise.all([
+      ...validatedData.cuisines.map((cuisine) =>
+        Promise.all([
+          client.sAdd(cuisinesKey, cuisine),
+          client.sAdd(cuisineKey(cuisine), id),
+          client.sAdd(restaurantCuisinesKeyById(id), cuisine),
+        ]),
+      ),
+      client.hSet(restaurantKey, hashData),
+      client.zAdd(restaurantsByRatingKey, {
+        score: 0,
+        value: id,
+      }),
+      client.bf.add(restaurantsBloomKey, bloomString),
+    ]);
 
-  const responseBody = createSuccessResponse(
-    { id, key: restaurantKey },
-    "New restaurant created and saved"
-  );
+    const responseBody = createSuccessResponse(
+      { id, key: restaurantKey },
+      "New restaurant created and saved",
+    );
 
-  return c.json(responseBody, 201);
-});
+    return c.json(responseBody, 201);
+  },
+);
 
-app.get("/search", async (c) => {
+router.get("/search", async (c) => {
   const { q } = c.req.query();
   const client = await initializeRedisClient();
 
@@ -109,7 +109,7 @@ app.get("/search", async (c) => {
   return c.json(responseBody, 200);
 });
 
-app.post(
+router.post(
   "/:restaurantId/details",
   checkRestaurantExists,
   zValidator("json", RestaurantDetailsSchema),
@@ -121,29 +121,23 @@ app.post(
     const restaurantDetailsKey = restaurantDetailsKeyById(restaurantId);
     await client.json.set(restaurantDetailsKey, ".", validatedData);
 
-    const responseBody = createSuccessResponse(
-      validatedData,
-      "Restaurant details added"
-    );
+    const responseBody = createSuccessResponse(validatedData, "Restaurant details added");
     return c.json(responseBody, 201);
-  }
+  },
 );
 
-app.get("/:restaurantId/details", checkRestaurantExists, async (c) => {
+router.get("/:restaurantId/details", checkRestaurantExists, async (c) => {
   const restaurantId = c.req.param("restaurantId");
   const client = await initializeRedisClient();
 
   const restaurantDetailsKey = restaurantDetailsKeyById(restaurantId);
   const details = await client.json.get(restaurantDetailsKey);
 
-  const responseBody = createSuccessResponse(
-    details,
-    "Restaurant details fetched"
-  );
+  const responseBody = createSuccessResponse(details, "Restaurant details fetched");
   return c.json(responseBody, 201);
 });
 
-app.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
+router.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
   const restaurantId = c.req.param("restaurantId");
 
   const client = await initializeRedisClient();
@@ -164,7 +158,7 @@ app.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
 
   const [longitude, latitude] = coords.split(",");
   const apiResponse = await fetch(
-    `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${process.env.WEATHER_API_KEY}`
+    `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${process.env.WEATHER_API_KEY}`,
   );
 
   if (apiResponse.status === 200) {
@@ -179,14 +173,16 @@ app.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
   return c.json(createErrorResponse("Could not fetch weather info"), 503);
 });
 
-app.post(
+router.post(
   "/:restaurantId/reviews",
+  requireAuth,
   checkRestaurantExists,
   zValidator("json", ReviewSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
     const data: Review = c.req.valid("json");
     const client = await initializeRedisClient();
+    const user = c.get("user");
 
     const reviewId = nanoid();
     const reviewKey = reviewKeyById(restaurantId);
@@ -220,10 +216,10 @@ app.post(
 
     const responseBody = createSuccessResponse(reviewData, "Review added");
     return c.json(responseBody, 201);
-  }
+  },
 );
 
-app.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
+router.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
   const restaurantId = c.req.param("restaurantId");
   const client = await initializeRedisClient();
   const reviewKey = reviewKeyById(restaurantId);
@@ -234,14 +230,14 @@ app.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
 
   const reviewIds = await client.lRange(reviewKey, start, end);
   const reviews = await Promise.all(
-    reviewIds.map((id) => client.hGetAll(reviewDetailsKeyById(id)))
+    reviewIds.map((id) => client.hGetAll(reviewDetailsKeyById(id))),
   );
 
   const responseBody = createSuccessResponse(reviews, "Reviews fetched");
   return c.json(responseBody, 200);
 });
 
-app.put(
+router.put(
   "/:restaurantId",
   checkRestaurantExists,
   zValidator("json", RestaurantSchema),
@@ -266,9 +262,7 @@ app.put(
     const newCuisines = newData.cuisines;
 
     const cuisinesToAdd = newCuisines.filter((c) => !oldCuisines.includes(c));
-    const cuisinesToRemove = oldCuisines.filter(
-      (c) => !newCuisines.includes(c)
-    );
+    const cuisinesToRemove = oldCuisines.filter((c) => !newCuisines.includes(c));
 
     const operations = [client.hSet(restaurantKey, updatedHashData)];
 
@@ -291,22 +285,21 @@ app.put(
     await Promise.all(operations);
 
     return c.json(
-      createSuccessResponse(
-        updatedHashData,
-        "Restaurant updated and cuisines were synchronized"
-      )
+      createSuccessResponse(updatedHashData, "Restaurant updated and cuisines were synchronized"),
     );
-  }
+  },
 );
 
-app.put(
+router.put(
   "/:restaurantId/reviews/:reviewId",
+  requireAuth,
   checkRestaurantExists,
   checkReviewExists,
   zValidator("json", ReviewSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
     const restaurantKey = restaurantKeyById(restaurantId);
+    const user = c.get("user");
 
     const reviewId = c.req.param("reviewId");
     const reviewDetailsKey = reviewDetailsKeyById(reviewId);
@@ -322,7 +315,7 @@ app.put(
     const newTotalStarsString = await client.hIncrByFloat(
       restaurantKey,
       "totalStars",
-      ratingDifference
+      ratingDifference,
     );
 
     const reviewCount = await client.lLen(reviewKeyById(restaurantId));
@@ -346,18 +339,15 @@ app.put(
     ]);
 
     return c.json(
-      createSuccessResponse(
-        finalReviewData,
-        "Review updated, total rating was recalculated"
-      )
+      createSuccessResponse(finalReviewData, "Review updated, total rating was recalculated"),
     );
-  }
+  },
 );
 
-app.put(
+router.put(
   "/:restaurantId/details",
-  checkRestaurantExists, 
-  zValidator("json", RestaurantDetailsSchema), 
+  checkRestaurantExists,
+  zValidator("json", RestaurantDetailsSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
     const validatedData: RestaurantDetails = c.req.valid("json");
@@ -367,49 +357,42 @@ app.put(
 
     await client.json.set(restaurantDetailsKey, ".", validatedData);
 
-    const responseBody = createSuccessResponse(
-      validatedData,
-      "Restaurant details updated"
-    );
+    const responseBody = createSuccessResponse(validatedData, "Restaurant details updated");
 
     return c.json(responseBody, 200);
-  }
+  },
 );
 
-app.delete(
-  "/:restaurantId/reviews/:reviewId",
-  checkRestaurantExists,
-  async (c) => {
-    const restaurantId = c.req.param("restaurantId");
-    const reviewId = c.req.param("reviewId");
-    const client = await initializeRedisClient();
+router.delete("/:restaurantId/reviews/:reviewId", checkRestaurantExists, async (c) => {
+  const restaurantId = c.req.param("restaurantId");
+  const reviewId = c.req.param("reviewId");
+  const client = await initializeRedisClient();
 
-    const reviewKey = reviewKeyById(restaurantId);
-    const reviewDetailsKey = reviewDetailsKeyById(reviewId);
+  const reviewKey = reviewKeyById(restaurantId);
+  const reviewDetailsKey = reviewDetailsKeyById(reviewId);
 
-    const [removeResult, deleteResult] = await Promise.all([
-      client.lRem(reviewKey, 0, reviewId),
-      client.del(reviewDetailsKey),
-    ]);
+  const [removeResult, deleteResult] = await Promise.all([
+    client.lRem(reviewKey, 0, reviewId),
+    client.del(reviewDetailsKey),
+  ]);
 
-    if (removeResult === 0 && deleteResult === 0) {
-      const errorBody = createErrorResponse("Review not found");
-      return c.json(errorBody, 404);
-    }
-
-    const responseBody = createSuccessResponse(
-      {
-        reviewId,
-        listRemoved: removeResult > 0,
-        hashDeleted: deleteResult > 0,
-      },
-      "Review deleted"
-    );
-    return c.json(responseBody, 200);
+  if (removeResult === 0 && deleteResult === 0) {
+    const errorBody = createErrorResponse("Review not found");
+    return c.json(errorBody, 404);
   }
-);
 
-app.get("/:restaurantId", checkRestaurantExists, async (c) => {
+  const responseBody = createSuccessResponse(
+    {
+      reviewId,
+      listRemoved: removeResult > 0,
+      hashDeleted: deleteResult > 0,
+    },
+    "Review deleted",
+  );
+  return c.json(responseBody, 200);
+});
+
+router.get("/:restaurantId", checkRestaurantExists, async (c) => {
   const restaurantId = c.req.param("restaurantId");
   const client = await initializeRedisClient();
 
@@ -428,4 +411,4 @@ app.get("/:restaurantId", checkRestaurantExists, async (c) => {
   return c.json(responseBody, 200);
 });
 
-export default app;
+export default router;
