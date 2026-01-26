@@ -1,11 +1,10 @@
 import { betterAuth } from "better-auth";
 import { admin as adminPlugin } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
-import { createClient } from "redis";
+import { initializeRedisClient } from "../utils/client";
 import { ac, admin, owner, user } from "./permissions";
 
-const redis = createClient();
-await redis.connect();
+const redis = await initializeRedisClient();
 
 export const auth = betterAuth({
   database: new Database("database.sqlite"),
