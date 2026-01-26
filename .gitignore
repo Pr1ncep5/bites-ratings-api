@@ -40,3 +40,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Redis
 dump.rdb
 appendonly.aof 
+
+# BetterAuth & SQLite
+database.sqlite
+database.sqlite-journal
+database.sqlite-shm
+database.sqlite-wal
