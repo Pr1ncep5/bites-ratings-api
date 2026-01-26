@@ -2,10 +2,19 @@ import { Hono } from "hono";
 import { createErrorResponse } from "./src/utils/responses";
 import restaurantsRouter from "./src/routes/restaurants";
 import cuisinesRouter from "./src/routes/cuisines";
+import authRouter from "./src/routes/auth";
+import { type AuthType } from "./src/lib/auth";
+import { sessionMiddleware } from "./src/middlewares/authMiddleware";
 
 const PORT = parseInt(process.env.PORT || "3000");
 
-const app = new Hono();
+const app = new Hono<{ Variables: AuthType }>({
+  strict: false,
+});
+
+app.route("/api/auth", authRouter);
+
+app.use("*", sessionMiddleware);
 
 app.route("/restaurants", restaurantsRouter);
 app.route("/cuisines", cuisinesRouter);
