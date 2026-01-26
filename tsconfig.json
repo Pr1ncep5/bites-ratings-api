@@ -28,6 +28,6 @@
     "outDir": "dist", 
     "noEmit": false, 
 
-    "types": ["@types/node", "redis"], 
+    "types": ["bun", "redis"], 
   }
 }
