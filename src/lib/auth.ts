@@ -34,6 +34,26 @@ export const auth = betterAuth({
     }),
   ],
   trustedOrigins: ["http://localhost:3000"],
+  rateLimit: {
+    enabled: true,
+    storage: "secondary-storage",
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": {
+        window: 10,
+        max: 3,
+      },
+      "/sign-up/email": {
+        window: 60,
+        max: 5,
+      },
+      "/forgot-password/*": {
+        window: 60,
+        max: 3,
+      },
+    },
+  },
 });
 
 export type AuthType = {
