@@ -4,8 +4,11 @@ import restaurantsRouter from "./src/routes/restaurants";
 import cuisinesRouter from "./src/routes/cuisines";
 import adminRouter from "./src/routes/admin";
 import authRouter from "./src/routes/auth";
+import wsRouter from "./src/routes/web-sockets";
 import { type AuthType } from "./src/lib/auth";
 import { sessionMiddleware } from "./src/middlewares/authMiddleware";
+import { initializePubSub } from "./src/pubsub/subscriber";
+import { websocket } from "hono/bun";
 
 const PORT = parseInt(process.env.PORT || "3000");
 
@@ -14,6 +17,7 @@ const app = new Hono<{ Variables: AuthType }>({
 });
 
 app.route("/api/auth", authRouter);
+app.route("/ws", wsRouter);
 
 app.use("*", sessionMiddleware);
 
@@ -34,9 +38,12 @@ app.notFound((c) => {
   return c.json(errorBody, 404);
 });
 
+await initializePubSub();
+
 console.log(`Application running on port ${PORT}`);
 
 export default {
   port: PORT,
   fetch: app.fetch,
+  websocket,
 };

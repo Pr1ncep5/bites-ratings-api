@@ -27,6 +27,7 @@ import { createErrorResponse, createSuccessResponse } from "../utils/responses";
 import { checkRestaurantExists } from "../middlewares/checkRestaurantId";
 import { checkReviewExists } from "../middlewares/checkReviewId";
 import { requireAuth, requireRole } from "../middlewares/authMiddleware";
+import { publishRestaurantUpdate } from "../pubsub/channels";
 import type { AuthType } from "../lib/auth";
 
 const router = new Hono<{ Variables: AuthType }>();
@@ -215,6 +216,13 @@ router.post(
       client.hSet(restaurantKey, "avgStars", averageRating),
     ]);
 
+    await publishRestaurantUpdate(client, {
+      type: "NEW_REVIEW",
+      restaurantId,
+      reviewId,
+      rating: data.rating,
+    });
+
     const responseBody = createSuccessResponse(reviewData, "Review added");
     return c.json(responseBody, 201);
   },
@@ -285,6 +293,11 @@ router.put(
 
     await Promise.all(operations);
 
+    await publishRestaurantUpdate(client, {
+      type: "RESTAURANT_UPDATED",
+      restaurantId,
+    });
+
     return c.json(
       createSuccessResponse(updatedHashData, "Restaurant updated and cuisines were synchronized"),
     );
@@ -347,6 +360,12 @@ router.put(
       }),
     ]);
 
+    await publishRestaurantUpdate(client, {
+      type: "REVIEW_UPDATED",
+      restaurantId,
+      reviewId,
+    });
+
     return c.json(
       createSuccessResponse(finalReviewData, "Review updated, total rating was recalculated"),
     );
@@ -389,6 +408,12 @@ router.delete("/:restaurantId/reviews/:reviewId", checkRestaurantExists, async (
     const errorBody = createErrorResponse("Review not found");
     return c.json(errorBody, 404);
   }
+
+  await publishRestaurantUpdate(client, {
+    type: "REVIEW_DELETED",
+    restaurantId,
+    reviewId,
+  });
 
   const responseBody = createSuccessResponse(
     {
