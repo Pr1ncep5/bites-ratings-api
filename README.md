@@ -4,10 +4,11 @@
 [![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)](https://bun.sh/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)](https://hono.dev/)
+[![Drizzle](https://img.shields.io/badge/Drizzle-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team/docs/overview)
 [![BetterAuth](https://img.shields.io/badge/BetterAuth-000000?logo=betterauth&logoColor=white)](https://www.better-auth.com/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-A high-performance RESTful API for restaurant management and review processing, built with Redis Stack as a multi-model primary database. This project demonstrates some advanced data structures, sophisticated cache invalidation strategies, and real-time rating calculations.
+A high-performance RESTful API for restaurant management and review processing, built with Redis Stack as a multi-model primary database. This project demonstrates advanced data structures, sophisticated cache invalidation strategies, real-time WebSocket updates via Redis Pub/Sub, and type-safe database access with Drizzle ORM.
 
 ---
 
@@ -17,6 +18,7 @@ A high-performance RESTful API for restaurant management and review processing, 
 - [Architecture](#architecture)
 - [Key Features](#key-features)
 - [Authentication \& Security](#authentication--security)
+- [Real-Time Updates](#real-time-updates)
 - [Technology Stack](#technology-stack)
 - [Getting Started](#getting-started)
 - [API Reference](#api-reference)
@@ -42,6 +44,7 @@ The project treats Redis as a primary multi-model database rather than a simple 
 flowchart TB
     subgraph client [Client]
         API[REST API Requests]
+        WS[WebSocket Connection]
     end
 
     subgraph app [Hono Application]
@@ -49,6 +52,7 @@ flowchart TB
         AuthMW[Auth Middleware]
         MW[Middleware Layer]
         Valid[Zod Validation]
+        WSHandler[WebSocket Handler]
     end
 
     subgraph auth [BetterAuth]
@@ -60,10 +64,13 @@ flowchart TB
         subgraph redis [Redis Stack]
             Hash[Hashes - Restaurant/Review Data]
             SSet[Sorted Sets - Leaderboard]
-            Sessions[Sessions - secondaryStorage]
+            Sessions[Sessions + Rate Limiting]
             Bloom[RedisBloom - Duplicates]
+            PubSub[Pub/Sub - Real-Time Events]
         end
-        SQLite[(SQLite - Users/Accounts)]
+        subgraph sqlite [SQLite via Drizzle ORM]
+            Users[(Users/Accounts)]
+        end
     end
 
     subgraph external [External Services]
@@ -73,13 +80,19 @@ flowchart TB
     API --> Routes
     Routes --> AuthMW
     AuthMW --> BA
-    BA --> SQLite
+    BA --> Users
     BA --> Sessions
     AuthMW --> MW
     MW --> Valid
     Valid --> redis
+    Valid -.-> |publish| PubSub
     Routes --> Weather
     Weather -.-> |cached| redis
+
+    WS --> WSHandler
+    WSHandler --> PubSub
+    PubSub -.-> |broadcast| WSHandler
+    WSHandler -.-> |events| WS
 ```
 
 ### Redis Module Usage
@@ -89,6 +102,7 @@ flowchart TB
 | **RediSearch**  | Full-text indexing of `name` field with sortable `avgStars`         |
 | **RedisBloom**  | Duplicate prevention during restaurant creation (~0.01% error rate) |
 | **RedisJSON**   | Atomic updates for nested restaurant details (links, contacts)      |
+| **Pub/Sub**     | Real-time event broadcasting for WebSocket clients                  |
 | **Sorted Sets** | Restaurant leaderboard with O(log N) ranking updates                |
 | **Hashes**      | Primary storage for restaurant and review entities                  |
 | **Sets**        | Cuisine categorization and restaurant-cuisine relationships         |
@@ -98,6 +112,8 @@ flowchart TB
 
 ## Key Features
 
+- **Real-Time Updates via Pub/Sub** - WebSocket connections receive instant notifications when reviews are added/updated/deleted or restaurants are modified
+- **Type-Safe Database Access** - Drizzle ORM for SQLite with full TypeScript inference and compile-time query validation
 - **Bloom Filter Duplicate Prevention** - Prevents duplicate restaurant entries using probabilistic membership testing with configurable error rate
 - **Full-Text Search** - Search restaurants by name using RediSearch indexing
 - **Real-Time Rating Recalculation** - Atomic average rating updates with automatic leaderboard synchronization
@@ -130,6 +146,42 @@ The API uses the BetterAuth Admin plugin to enforce permissions for different ro
 | `owner` | Update owned restaurants, manage reviews                                |
 | `user`  | Create and edit own reviews only                                        |
 
+### Rate Limiting
+
+The API includes built-in rate limiting powered by Redis secondary storage:
+
+| Endpoint          | Limit                | Purpose                    |
+| ----------------- | -------------------- | -------------------------- |
+| Global            | 100 req / 60 seconds | General abuse prevention   |
+| `/sign-in/email`  | 3 req / 10 seconds   | Brute-force protection     |
+| `/sign-up/email`  | 5 req / 60 seconds   | Registration spam defense  |
+| `/forgot-password`| 3 req / 60 seconds   | Password reset abuse guard |
+
+---
+
+## Real-Time Updates
+
+The API supports real-time notifications via WebSockets, powered by Redis Pub/Sub for horizontal scalability.
+
+### How It Works
+
+1. Clients connect to `ws://localhost:3000/web-sockets`
+2. Subscribe to specific restaurants: `{"action":"subscribe","restaurantId":"abc123"}`
+3. Receive instant events when data changes (new reviews, updates, deletions)
+
+### Event Types
+
+| Event                | Trigger                      | Payload                              |
+| -------------------- | ---------------------------- | ------------------------------------ |
+| `NEW_REVIEW`         | Review created               | `restaurantId`, `reviewId`, `rating` |
+| `REVIEW_UPDATED`     | Review edited                | `restaurantId`, `reviewId`           |
+| `REVIEW_DELETED`     | Review removed               | `restaurantId`, `reviewId`           |
+| `RESTAURANT_UPDATED` | Restaurant details changed   | `restaurantId`                       |
+
+### Why Redis Pub/Sub?
+
+When you deploy multiple server instances behind a load balancer, a user connected to Server A won't see updates from Server B without a message broker. Redis Pub/Sub solves this, because all instances subscribe to the same channel and broadcast events to their connected clients.
+
 ---
 
 ## Technology Stack
@@ -139,6 +191,7 @@ The API uses the BetterAuth Admin plugin to enforce permissions for different ro
 | **Runtime**          | Bun                           |
 | **Framework**        | Hono                          |
 | **Primary Database** | Redis Stack & SQLite for Auth |
+| **ORM**              | Drizzle ORM                   |
 | **Authentication**   | BetterAuth                    |
 | **Validation**       | Zod                           |
 | **Infrastructure**   | Docker & Docker Compose       |
@@ -188,9 +241,11 @@ bun install
 
 5. **Initialize database structures:**
 
-This command sets up the RediSearch index and reserves memory for the Bloom filter:
-
 ```bash
+# Create SQLite tables via Drizzle ORM
+bunx drizzle-kit push
+
+# Set up RediSearch index and Bloom filter
 bun run setup
 ```
 
@@ -245,6 +300,12 @@ The API will be available at `http://localhost:3000`. RedisInsight UI is accessi
 | ------ | -------------------- | --------------------------- |
 | `GET`  | `/cuisines`          | List all cuisines           |
 | `GET`  | `/cuisines/:cuisine` | List restaurants by cuisine |
+
+### WebSocket
+
+| Endpoint        | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `/web-sockets`  | Real-time updates (subscribe to restaurant IDs) |
 
 ---
 
