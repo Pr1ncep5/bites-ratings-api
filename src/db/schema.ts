@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { sqliteTable, type AnySQLiteColumn, text, integer, numeric, index, foreignKey } from "drizzle-orm/sqlite-core"
+import { sqliteTable, type AnySQLiteColumn, text, integer, numeric, index, foreignKey, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { sql } from "drizzle-orm"
 
 export const RestaurantSchema = z.object({
@@ -80,4 +80,30 @@ export const verification = sqliteTable("verification", {
 },
   (table) => [
     index("verification_identifier_idx").on(table.identifier),
+  ]);
+
+export const restaurantFollows = sqliteTable("restaurant_follows", {
+  id: text().primaryKey().notNull(),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  restaurantId: text().notNull(),
+  createdAt: numeric().notNull(),
+},
+  (table) => [
+    index("follows_userId_idx").on(table.userId),
+    index("follows_restaurantId_idx").on(table.restaurantId),
+    uniqueIndex("follows_user_restaurant_unq").on(table.userId, table.restaurantId),
+  ]);
+
+export const notifications = sqliteTable("notifications", {
+  id: text().primaryKey().notNull(),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  type: text().notNull(),
+  restaurantId: text().notNull(),
+  data: text().notNull(),
+  read: integer("read", { mode: "boolean" }).notNull().default(false),
+  createdAt: numeric().notNull(),
+},
+  (table) => [
+    index("notifications_userId_idx").on(table.userId),
+    index("notifications_userId_read_idx").on(table.userId, table.read),
   ]);
