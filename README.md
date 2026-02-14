@@ -67,6 +67,7 @@ flowchart TB
             Sessions[Sessions + Rate Limiting]
             Bloom[RedisBloom - Duplicates]
             PubSub[Pub/Sub - Real-Time Events]
+            Streams[Streams - Durable Event Log]
         end
         subgraph sqlite [SQLite via Drizzle ORM]
             Users[(Users/Accounts)]
@@ -86,6 +87,7 @@ flowchart TB
     MW --> Valid
     Valid --> redis
     Valid -.-> |publish| PubSub
+    Valid -.-> |append| Streams
     Routes --> Weather
     Weather -.-> |cached| redis
 
@@ -103,6 +105,7 @@ flowchart TB
 | **RedisBloom**  | Duplicate prevention during restaurant creation (~0.01% error rate) |
 | **RedisJSON**   | Atomic updates for nested restaurant details (links, contacts)      |
 | **Pub/Sub**     | Real-time event broadcasting for WebSocket clients                  |
+| **Streams**     | Durable append-only domain event history (audit + replay)           |
 | **Sorted Sets** | Restaurant leaderboard with O(log N) ranking updates                |
 | **Hashes**      | Primary storage for restaurant and review entities                  |
 | **Sets**        | Cuisine categorization and restaurant-cuisine relationships         |
@@ -113,6 +116,7 @@ flowchart TB
 ## Key Features
 
 - **Real-Time Updates via Pub/Sub** - WebSocket connections receive instant notifications when reviews are added/updated/deleted or restaurants are modified
+- **Durable Event History with Streams** - Mutation events are appended to Redis Streams for auditability and replay
 - **Type-Safe Database Access** - Drizzle ORM for SQLite with full TypeScript inference and compile-time query validation
 - **Bloom Filter Duplicate Prevention** - Prevents duplicate restaurant entries using probabilistic membership testing with configurable error rate
 - **Full-Text Search** - Search restaurants by name using RediSearch indexing
@@ -182,6 +186,19 @@ The API supports real-time notifications via WebSockets, powered by Redis Pub/Su
 
 When you deploy multiple server instances behind a load balancer, a user connected to Server A won't see updates from Server B without a message broker. Redis Pub/Sub solves this, because all instances subscribe to the same channel and broadcast events to their connected clients.
 
+### Redis Streams (Event Log)
+
+The API also appends mutation events into Redis Streams using an immutable event log pattern.
+
+- **Pub/Sub** is transient: great for live fan-out, but messages are lost if no subscriber is listening.
+- **Streams** are durable: events are persisted, can be inspected later, and can be replayed by future consumers.
+
+Current domain events:
+
+- `REVIEW_CREATED`
+- `REVIEW_UPDATED`
+- `REVIEW_DELETED`
+- `RESTAURANT_UPDATED`
 ---
 
 ## Technology Stack
@@ -300,6 +317,12 @@ The API will be available at `http://localhost:3000`. RedisInsight UI is accessi
 | ------ | -------------------- | --------------------------- |
 | `GET`  | `/cuisines`          | List all cuisines           |
 | `GET`  | `/cuisines/:cuisine` | List restaurants by cuisine |
+
+### Admin
+
+| Method | Endpoint              | Description                                        |
+| ------ | --------------------- | -------------------------------------------------- |
+| `GET`  | `/admin/events`       | Read latest Redis Stream domain events (admin only) |
 
 ### WebSocket
 
