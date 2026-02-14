@@ -23,3 +23,5 @@ export const restaurantDetailsKeyById = (id: string) =>
 export const restaurantsIndexKey = getKeyName("idx", "restaurants");
 
 export const restaurantsBloomKey = getKeyName("bloom_restaurants");
+
+export const eventsStreamKey = getKeyName("events");
