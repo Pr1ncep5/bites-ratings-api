@@ -28,6 +28,7 @@ import { checkRestaurantExists } from "../middlewares/checkRestaurantId";
 import { checkReviewExists } from "../middlewares/checkReviewId";
 import { requireAuth, requireRole } from "../middlewares/authMiddleware";
 import { publishRestaurantUpdate } from "../pubsub/channels";
+import { appendDomainEvent } from "../streams/events";
 import type { AuthType } from "../lib/auth";
 
 const router = new Hono<{ Variables: AuthType }>();
@@ -223,6 +224,24 @@ router.post(
       rating: data.rating,
     });
 
+    try {
+      await appendDomainEvent(client, {
+        eventId: nanoid(),
+        eventType: "REVIEW_CREATED",
+        timestamp: Date.now(),
+        actorUserId: user?.id ?? null,
+        entityId: reviewId,
+        entityType: "review",
+        payload: {
+          restaurantId,
+          reviewId,
+          rating: data.rating,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to append stream event REVIEW_CREATED:", error);
+    }
+
     const responseBody = createSuccessResponse(reviewData, "Review added");
     return c.json(responseBody, 201);
   },
@@ -298,6 +317,25 @@ router.put(
       restaurantId,
     });
 
+    try {
+      await appendDomainEvent(client, {
+        eventId: nanoid(),
+        eventType: "RESTAURANT_UPDATED",
+        timestamp: Date.now(),
+        actorUserId: c.get("user")?.id ?? null,
+        entityId: restaurantId,
+        entityType: "restaurant",
+        payload: {
+          restaurantId,
+          locationChanged: hasLocationChanged,
+          cuisinesAdded: cuisinesToAdd,
+          cuisinesRemoved: cuisinesToRemove,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to append stream event RESTAURANT_UPDATED:", error);
+    }
+
     return c.json(
       createSuccessResponse(updatedHashData, "Restaurant updated and cuisines were synchronized"),
     );
@@ -366,6 +404,25 @@ router.put(
       reviewId,
     });
 
+    try {
+      await appendDomainEvent(client, {
+        eventId: nanoid(),
+        eventType: "REVIEW_UPDATED",
+        timestamp: Date.now(),
+        actorUserId: user?.id ?? null,
+        entityId: reviewId,
+        entityType: "review",
+        payload: {
+          restaurantId,
+          reviewId,
+          oldRating,
+          newRating,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to append stream event REVIEW_UPDATED:", error);
+    }
+
     return c.json(
       createSuccessResponse(finalReviewData, "Review updated, total rating was recalculated"),
     );
@@ -414,6 +471,23 @@ router.delete("/:restaurantId/reviews/:reviewId", checkRestaurantExists, async (
     restaurantId,
     reviewId,
   });
+
+  try {
+    await appendDomainEvent(client, {
+      eventId: nanoid(),
+      eventType: "REVIEW_DELETED",
+      timestamp: Date.now(),
+      actorUserId: c.get("user")?.id ?? null,
+      entityId: reviewId,
+      entityType: "review",
+      payload: {
+        restaurantId,
+        reviewId,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to append stream event REVIEW_DELETED:", error);
+  }
 
   const responseBody = createSuccessResponse(
     {
