@@ -8,6 +8,13 @@
       "when": 1770652917052,
       "tag": "0000_married_gorgon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1771085051876,
+      "tag": "0001_sparkling_unus",
+      "breakpoints": true
     }
   ]
 }
