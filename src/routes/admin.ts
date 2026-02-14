@@ -5,6 +5,8 @@ import type { AuthType } from "../lib/auth";
 import { user } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
+import { initializeRedisClient } from "../utils/client";
+import { eventsStreamKey } from "../utils/keys";
 
 const router = new Hono<{ Variables: AuthType }>();
 
@@ -35,6 +37,35 @@ router.get("/user-lookup", async (c) => {
 router.get("/users", async (c) => {
   const allUsers = await db.select().from(user);
   return c.json(createSuccessResponse(allUsers, "All registered users retrieved, in total: " + allUsers.length));
+});
+
+router.get("/events", async (c) => {
+  const client = await initializeRedisClient();
+  const count = Number(c.req.query("count") ?? "50");
+
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.min(count, 200) : 50;
+
+  const streamEntries = await client.xRevRange(eventsStreamKey, "+", "-", {
+    COUNT: safeCount,
+  });
+
+  const events = streamEntries.map((entry) => {
+    const fields = entry.message;
+    return {
+      streamId: entry.id,
+      eventId: fields.eventId,
+      eventType: fields.eventType,
+      timestamp: new Date(Number(fields.timestamp)).toISOString(),
+      actorUserId: fields.actorUserId || null,
+      entityId: fields.entityId,
+      entityType: fields.entityType,
+      payload: fields.payload ? JSON.parse(fields.payload) : null,
+    };
+  });
+
+  return c.json(
+    createSuccessResponse(events, `Latest ${events.length} domain events retrieved`),
+  );
 });
 
 export default router;
