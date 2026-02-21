@@ -1,9 +1,12 @@
 import { initializeSubscriberClient } from "../utils/client";
 import { CHANNELS, type RestaurantUpdateEvent } from "./channels";
 import { broadcast } from "./manager";
+import { initializeUserManager } from "./user-manager";
 
 export async function initializePubSub() {
   const subscriber = await initializeSubscriberClient();
+
+  initializeUserManager(subscriber);
 
   await subscriber.subscribe(CHANNELS.RESTAURANT_UPDATES, (message) => {
     try {
