@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { admin as adminPlugin } from "better-auth/plugins";
 import { Database } from "bun:sqlite";
 import { initializeRedisClient } from "../utils/client";
-import { ac, admin, owner, user } from "./permissions";
+import { ac, admin, owner, user } from "@bites-ratings/shared";
 
 const redis = await initializeRedisClient();
 
