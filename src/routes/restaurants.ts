@@ -29,6 +29,7 @@ import { checkReviewExists } from "../middlewares/checkReviewId";
 import { requireAuth, requireRole } from "../middlewares/authMiddleware";
 import { publishRestaurantUpdate } from "../pubsub/channels";
 import { appendDomainEvent } from "../streams/events";
+import { notifyFollowers } from "../notifications/service";
 import type { AuthType } from "../lib/auth";
 
 const router = new Hono<{ Variables: AuthType }>();
@@ -242,6 +243,16 @@ router.post(
       console.error("Failed to append stream event REVIEW_CREATED:", error);
     }
 
+    notifyFollowers({
+      type: "NEW_REVIEW",
+      restaurantId,
+      data: {
+        reviewId,
+        rating: data.rating,
+        reviewerName: user?.name ?? "Anonymous",
+      },
+    }).catch((err) => console.error("Failed to notify followers:", err));
+
     const responseBody = createSuccessResponse(reviewData, "Review added");
     return c.json(responseBody, 201);
   },
@@ -335,6 +346,14 @@ router.put(
     } catch (error) {
       console.error("Failed to append stream event RESTAURANT_UPDATED:", error);
     }
+    notifyFollowers({
+      type: "RESTAURANT_UPDATED",
+      restaurantId,
+      data: {
+        restaurantName: newData.name,
+        locationChanged: hasLocationChanged,
+      },
+    }).catch((err) => console.error("Failed to notify followers:", err));
 
     return c.json(
       createSuccessResponse(updatedHashData, "Restaurant updated and cuisines were synchronized"),
