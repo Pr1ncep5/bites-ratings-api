@@ -5,6 +5,7 @@ import cuisinesRouter from "./src/routes/cuisines";
 import adminRouter from "./src/routes/admin";
 import authRouter from "./src/routes/auth";
 import wsRouter from "./src/routes/web-sockets";
+import followsRouter from "./src/routes/follows";
 import { type AuthType } from "./src/lib/auth";
 import { sessionMiddleware } from "./src/middlewares/authMiddleware";
 import { initializePubSub } from "./src/pubsub/subscriber";
@@ -24,6 +25,7 @@ app.use("*", sessionMiddleware);
 app.route("/restaurants", restaurantsRouter);
 app.route("/cuisines", cuisinesRouter);
 app.route("/admin", adminRouter);
+app.route("/follows", followsRouter);
 
 app.onError((err, c) => {
   console.error(`Application Error: ${err.message}`, err.stack);
