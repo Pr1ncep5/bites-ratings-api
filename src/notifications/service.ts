@@ -52,14 +52,14 @@ export async function notifyFollowers(
     };
   });
 
-  // 3. ONE batch insert - handles INSERT INTO notifications VALUES (...), (...), (...)
+  // ONE batch insert - handles INSERT INTO notifications VALUES (...), (...), (...)
   await db.insert(notifications).values(notificationRows);
 
   console.log(
     `[Notifications] Created ${notificationIds.length} notifications for restaurant ${event.restaurantId}`,
   );
 
-  // 4. Publish to Redis Pub/Sub for real-time delivery to connected WebSocket clients
+  // Publish to Redis Pub/Sub for real-time delivery to connected WebSocket clients
   // Each user gets their notification on their personal channel
   try {
     const redisClient = await initializeRedisClient();
