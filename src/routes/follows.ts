@@ -13,7 +13,7 @@ import type { AuthType } from "../lib/auth";
 const router = new Hono<{ Variables: AuthType }>();
 
 router.post(
-  "/restaurants/:restaurantId/follow",
+  "/:restaurantId",
   requireAuth,
   checkRestaurantExists,
   async (c) => {
@@ -60,7 +60,7 @@ router.post(
 );
 
 router.delete(
-  "/restaurants/:restaurantId/follow",
+  "/:restaurantId",
   requireAuth,
   checkRestaurantExists,
   async (c) => {
@@ -94,7 +94,7 @@ router.delete(
   },
 );
 
-router.get("/me/follows", requireAuth, async (c) => {
+router.get("/", requireAuth, async (c) => {
   const user = c.get("user");
   const { page = "1", limit = "10" } = c.req.query();
 
@@ -150,7 +150,7 @@ router.get("/me/follows", requireAuth, async (c) => {
 });
 
 router.get(
-  "/restaurants/:restaurantId/followers/count",
+  "/:restaurantId/count",
   checkRestaurantExists,
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
@@ -159,7 +159,7 @@ router.get(
       .select({ total: count() })
       .from(restaurantFollows)
       .where(eq(restaurantFollows.restaurantId, restaurantId));
-      
+
     const total = countResult[0]?.total ?? 0;
 
     return c.json(
