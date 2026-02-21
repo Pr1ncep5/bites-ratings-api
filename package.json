@@ -10,5 +10,8 @@
     "dev:api": "bun run --filter api dev",
     "dev:web": "bun run --filter web dev",
     "build": "bun run --filter '*' build"
+  },
+  "devDependencies": {
+    "@tanstack/router-plugin": "^1.161.4"
   }
 }
