@@ -1,6 +1,6 @@
 import { createAuthClient } from "better-auth/client";
 import { adminClient } from "better-auth/client/plugins";
-import { ac, admin, owner, user } from "./permissions";
+import { ac, admin, owner, user } from "@bites-ratings/shared";
 
 export const authClient = createAuthClient({
   baseURL: "http://localhost:3000",

@@ -18,6 +18,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@bites-ratings/shared": path.resolve(__dirname, "../../packages/shared/src/index.ts"),
     },
   },
 });

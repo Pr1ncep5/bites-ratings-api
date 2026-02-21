@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./permissions";
 
 export const RestaurantSchema = z.object({
     name: z.string().min(1),
