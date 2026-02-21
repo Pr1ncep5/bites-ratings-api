@@ -1,13 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import {
-  RestaurantDetailsSchema,
   RestaurantSchema,
+  RestaurantDetailsSchema,
   ReviewSchema,
   type Restaurant,
   type RestaurantDetails,
-  type Review,
-} from "../db/schema";
+  type Review
+} from "@bites-ratings/shared";
 import { initializeRedisClient } from "../utils/client";
 import { nanoid } from "nanoid";
 import {
@@ -379,7 +379,7 @@ router.put(
     const newData: Review = c.req.valid("json");
 
     const existingReview = await client.hGetAll(reviewDetailsKey);
-    
+
     if (existingReview.authorId && existingReview.authorId !== user!.id) {
       if (user!.role !== "admin") {
         return c.json(createErrorResponse("Forbidden - You can only edit your own reviews"), 403);
