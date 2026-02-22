@@ -2,9 +2,11 @@ import * as React from "react";
 import { Link, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient } from "@tanstack/react-query";
+import { authClient } from "@/lib/auth-client";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  auth: typeof authClient;
 }>()({
   component: RootComponent,
   notFoundComponent: () => {
@@ -20,7 +22,6 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   return (
     <React.Fragment>
-      <div>Hello "__root"!</div>
       <Toaster />
       <Outlet />
     </React.Fragment>
