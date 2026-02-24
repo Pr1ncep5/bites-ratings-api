@@ -6,9 +6,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --filter '*' dev",
-    "dev:api": "bun run --filter api dev",
-    "dev:web": "bun run --filter web dev",
+    "dev": "concurrently -k \"bun run dev:api\" \"bun run dev:web\"",
+    "dev:api": "bun --cwd apps/api dev",
+    "dev:web": "bun --cwd apps/web dev",
     "build": "bun run --filter '*' build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
