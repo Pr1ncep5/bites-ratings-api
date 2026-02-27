@@ -33,7 +33,7 @@ export const auth = betterAuth({
       },
     }),
   ],
-  trustedOrigins: ["http://localhost:3000"],
+  trustedOrigins: ["http://localhost:3000", "http://localhost:5173"],
   advanced: {
     ipAddress: {
       ipv6Subnet: 64, // Rate limit by /64 subnet instead of individual addresses

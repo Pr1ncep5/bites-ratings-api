@@ -1,4 +1,4 @@
-import { createAuthClient } from "better-auth/client";
+import { createAuthClient } from "better-auth/react";
 import { adminClient } from "better-auth/client/plugins";
 import { ac, admin, owner, user } from "@bites-ratings/shared";
 
@@ -19,9 +19,7 @@ export const authClient = createAuthClient({
       const { response } = context;
       if (response.status === 429) {
         const retryAfter = response.headers.get("X-Retry-After");
-        console.log(
-          `Rate limit exceeded. Retry after ${retryAfter} seconds`
-        );
+        console.log(`Rate limit exceeded. Retry after ${retryAfter} seconds`);
       }
     },
   },
