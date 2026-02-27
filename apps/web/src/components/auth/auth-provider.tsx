@@ -4,7 +4,7 @@ import { PageLoader } from "../page-loader";
 
 type SessionData = typeof authClient.$Infer.Session;
 
-type AuthContextType = {
+export type AuthContextType = {
   session: SessionData["session"] | null;
   user: SessionData["user"] | null;
   isPending: boolean;

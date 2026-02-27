@@ -4,7 +4,7 @@ import "./index.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen.ts";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { authClient } from "./lib/auth-client.ts";
+import { AuthProvider, useAuth } from "./components/auth/auth-provider.tsx";
 
 const queryClient = new QueryClient();
 
@@ -12,7 +12,7 @@ const router = createRouter({
   routeTree,
   context: {
     queryClient,
-    auth: authClient,
+    auth: undefined!,
   },
   defaultPreload: "intent",
   // Since we're using React Query, we don't want loader calls to ever be stale
@@ -28,6 +28,11 @@ declare module "@tanstack/react-router" {
   }
 }
 
+function InnerApp() {
+  const auth = useAuth();
+  return <RouterProvider router={router} context={{ auth }}/>
+}
+
 const rootElement = document.getElementById("root")!;
 
 if (!rootElement.innerHTML) {
@@ -35,7 +40,9 @@ if (!rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <AuthProvider>
+          <InnerApp />
+        </AuthProvider>
       </QueryClientProvider>
     </StrictMode>,
   );
