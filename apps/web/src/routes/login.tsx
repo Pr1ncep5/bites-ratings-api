@@ -3,9 +3,7 @@ import { LoginForm } from "@/components/auth/login-form";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async ({ context }) => {
-    const { data: session } = await context.auth.getSession();
-
-    if (session) {
+    if (context.auth.session) {
       throw redirect({ to: "/" });
     }
   },

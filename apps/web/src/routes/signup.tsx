@@ -3,9 +3,7 @@ import { SignupForm } from "@/components/auth/signup-form";
 
 export const Route = createFileRoute("/signup")({
   beforeLoad: async ({ context }) => {
-    const { data: session } = await context.auth.getSession();
-    
-    if (session) {
+    if (context.auth.session) {
       throw redirect({ to: "/" });
     }
   },
