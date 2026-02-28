@@ -1,9 +1,12 @@
 import type {
   PaginatedRestaurants,
-  SuccessResponse
+  PaginatedReviews,
+  RestaurantDetails,
+  SuccessResponse,
+  WeatherDetails
 } from "@bites-ratings/shared";
 
-const API = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const getRestaurants = async (
   page: number,
@@ -15,7 +18,7 @@ export const getRestaurants = async (
     params.set("cuisine", cuisine);
   }
 
-  const res = await fetch(`${API}/restaurants?${params}`, {
+  const res = await fetch(`${API_URL}/restaurants?${params}`, {
     credentials: "include",
   });
 
@@ -25,7 +28,27 @@ export const getRestaurants = async (
 };
 
 export const getCuisines = async (): Promise<SuccessResponse<string[]>> => {
-  const res = await fetch(`${API}/cuisines`, { credentials: "include" });
+  const res = await fetch(`${API_URL}/cuisines`, { credentials: "include" });
   if (!res.ok) throw new Error("Failed to fetch cuisines");
+  return res.json();
+};
+
+export const getRestaurantDetails = async (id: string): Promise<SuccessResponse<RestaurantDetails>> => {
+  const res = await fetch(`${API_URL}/restaurants/${id}/details`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch details");
+  return res.json();
+};
+
+export const getRestaurantWeather = async (id: string): Promise<SuccessResponse<WeatherDetails>> => {
+  const res = await fetch(`${API_URL}/restaurants/${id}/weather`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch weather");
+  return res.json();
+};
+
+export const getReviews = async (id: string, page = 1): Promise<SuccessResponse<PaginatedReviews>> => {
+  const res = await fetch(`${API_URL}/restaurants/${id}/reviews?page=${page}&limit=10`, {
+    credentials: "include"
+  });
+  if (!res.ok) throw new Error("Failed to fetch reviews");
   return res.json();
 };

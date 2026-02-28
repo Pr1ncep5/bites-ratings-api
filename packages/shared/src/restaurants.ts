@@ -21,15 +21,9 @@ export const RestaurantDetailsSchema = RestaurantResponseSchema.extend({
     contacts: z.object({ phone: z.string().min(1), email: z.email() }).optional(),
 });
 
-export const ReviewCreateSchema = z.object({
-    review: z.string().min(1),
-    rating: z.number().min(1).max(5),
-});
-
 export type RestaurantCreate = z.infer<typeof RestaurantCreateSchema>;
 export type RestaurantListItem = z.infer<typeof RestaurantResponseSchema>;
 export type RestaurantDetails = z.infer<typeof RestaurantDetailsSchema>;
-export type ReviewCreate = z.infer<typeof ReviewCreateSchema>;
 
 export type PaginatedRestaurants = {
     restaurants: RestaurantListItem[];

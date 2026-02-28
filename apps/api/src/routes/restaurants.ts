@@ -5,6 +5,7 @@ import {
   RestaurantDetailsSchema,
   RestaurantResponseSchema,
   ReviewCreateSchema,
+  ReviewResponseSchema,
   type RestaurantCreate,
   type RestaurantDetails,
   type ReviewCreate,
@@ -301,16 +302,29 @@ router.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
   const client = await initializeRedisClient();
   const reviewKey = reviewKeyById(restaurantId);
 
-  const { page = 1, limit = 10 } = c.req.query();
-  const start = (Number(page) - 1) * Number(limit);
-  const end = start + Number(limit) - 1;
+  const { page = "1", limit = "10" } = c.req.query();
+  const pageNum = Number(page);
+  const limitNum = Number(limit);
+
+  const start = (pageNum - 1) * limitNum;
+  const end = start + limitNum - 1;
+
+  const totalReviews = await client.lLen(reviewKey);
+  const hasMoreReviews = totalReviews > start + limitNum;
 
   const reviewIds = await client.lRange(reviewKey, start, end);
   const reviews = await Promise.all(
     reviewIds.map((id) => client.hGetAll(reviewDetailsKeyById(id))),
   );
 
-  const responseBody = createSuccessResponse(reviews, "Reviews fetched");
+  const validatedReviews = reviews.map((raw) => ReviewResponseSchema.parse(raw));
+
+  const responseBody = createSuccessResponse({
+    validatedReviews,
+    hasMoreReviews,
+    page: pageNum
+  }, "Reviews fetched");
+
   return c.json(responseBody, 200);
 });
 
@@ -538,7 +552,7 @@ router.delete("/:restaurantId/reviews/:reviewId", checkRestaurantExists, async (
   const averageRating = newReviewCount === 0
     ? 0
     : Number((newTotalStars / newReviewCount).toFixed(1));
-  
+
   await Promise.all([
     client.hSet(restaurantKey, "avgStars", averageRating),
     client.zAdd(restaurantsByRatingKey, {
