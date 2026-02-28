@@ -11,12 +11,25 @@ import { type AuthType } from "./src/lib/auth";
 import { sessionMiddleware } from "./src/middlewares/authMiddleware";
 import { initializePubSub } from "./src/pubsub/subscriber";
 import { websocket } from "hono/bun";
+import { cors } from "hono/cors";
 
 const PORT = parseInt(process.env.PORT || "3000");
 
 const app = new Hono<{ Variables: AuthType }>({
   strict: false,
 });
+
+app.use(
+  "*",
+  cors({
+    origin: ["http://localhost:3000", "http://localhost:5173"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
+    exposeHeaders: ["Content-Length"],
+    maxAge: 600,
+    credentials: true,
+  }),
+);
 
 app.route("/api/auth", authRouter);
 app.route("/ws", wsRouter);
