@@ -4,7 +4,9 @@ import type {
   PaginatedReviews,
   RestaurantDetails,
   SuccessResponse,
-  WeatherDetails
+  WeatherDetails,
+  ReviewCreate,
+  ReviewListItem
 } from "@bites-ratings/shared";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -59,5 +61,29 @@ export const getReviews = async (id: string, page = 1): Promise<SuccessResponse<
     credentials: "include"
   });
   if (!res.ok) throw new Error("Failed to fetch reviews");
+  return res.json();
+};
+
+export const createReview = async ({
+  restaurantId,
+  data,
+}: {
+  restaurantId: string;
+  data: ReviewCreate;
+}): Promise<SuccessResponse<ReviewListItem>> => {
+  const res = await fetch(`${API_URL}/restaurants/${restaurantId}/reviews`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to submit review");
+  }
+
   return res.json();
 };
