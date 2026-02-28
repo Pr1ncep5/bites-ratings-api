@@ -1,12 +1,13 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import {
-  RestaurantSchema,
+  RestaurantCreateSchema,
   RestaurantDetailsSchema,
-  ReviewSchema,
-  type Restaurant,
+  RestaurantResponseSchema,
+  ReviewCreateSchema,
+  type RestaurantCreate,
   type RestaurantDetails,
-  type Review
+  type ReviewCreate,
 } from "@bites-ratings/shared";
 import { initializeRedisClient } from "../utils/client";
 import { nanoid } from "nanoid";
@@ -36,19 +37,56 @@ const router = new Hono<{ Variables: AuthType }>();
 
 router.get("/", async (c) => {
   const client = await initializeRedisClient();
-  const { page = 1, limit = 10 } = c.req.query();
+  const { page = "1", limit = "10", cuisine } = c.req.query();
 
-  const start = (Number(page) - 1) * Number(limit);
-  const end = start + Number(limit);
+  const pageNum = Number(page);
+  const limitNum = Number(limit);
+  const start = (pageNum - 1) * limitNum;
 
-  const restaurantIds = await client.zRange(restaurantsByRatingKey, start, end, {
-    REV: true,
+  let restaurantIds: string[];
+  let hasMore: boolean;
+
+  if (cuisine) {
+    const cuisineIds = await client.sMembers(cuisineKey(cuisine));
+    const scores = await Promise.all(
+      cuisineIds.map((id) => client.zScore(restaurantsByRatingKey, id)),
+    );
+    const sorted = cuisineIds
+      .map((id, i) => ({ id, score: scores[i] ?? 0 }))
+      .sort((a, b) => b.score - a.score);
+    restaurantIds = sorted.slice(start, start + limitNum).map((s) => s.id);
+    hasMore = sorted.length > start + limitNum;
+  } else {
+    const total = await client.zCard(restaurantsByRatingKey);
+    restaurantIds = await client.zRange(restaurantsByRatingKey, start, start + limitNum - 1, {
+      REV: true,
+    });
+    hasMore = total > start + limitNum;
+  }
+
+  const pipeline = client.multi();
+
+  restaurantIds.forEach((id) => {
+    pipeline.hGetAll(restaurantKeyById(id));
+    pipeline.sMembers(restaurantCuisinesKeyById(id));
   });
-  const restaurants = await Promise.all(
-    restaurantIds.map((id) => client.hGetAll(restaurantKeyById(id))),
-  );
 
-  const responseBody = createSuccessResponse(restaurants);
+  const results = await pipeline.exec();
+
+  const restaurants = [];
+  for (let i = 0; i < restaurantIds.length; i++) {
+    const rawData = results[i * 2] as unknown as Record<string, string>;
+    const cuisines = results[i * 2 + 1] as unknown as string[];
+
+    const validatedRestaurant = RestaurantResponseSchema.parse({
+      ...rawData,
+      cuisines,
+    });
+
+    restaurants.push(validatedRestaurant);
+  }
+
+  const responseBody = createSuccessResponse({ restaurants, hasMore, page: pageNum });
   return c.json(responseBody, 200);
 });
 
@@ -56,9 +94,9 @@ router.post(
   "/",
   requireAuth,
   requireRole("admin"),
-  zValidator("json", RestaurantSchema),
+  zValidator("json", RestaurantCreateSchema),
   async (c) => {
-    const validatedData: Restaurant = c.req.valid("json");
+    const validatedData: RestaurantCreate = c.req.valid("json");
     const client = await initializeRedisClient();
 
     const id = nanoid();
@@ -180,10 +218,10 @@ router.post(
   "/:restaurantId/reviews",
   requireAuth,
   checkRestaurantExists,
-  zValidator("json", ReviewSchema),
+  zValidator("json", ReviewCreateSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
-    const data: Review = c.req.valid("json");
+    const data: ReviewCreate = c.req.valid("json");
     const client = await initializeRedisClient();
     const user = c.get("user");
 
@@ -279,13 +317,13 @@ router.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
 router.put(
   "/:restaurantId",
   checkRestaurantExists,
-  zValidator("json", RestaurantSchema),
+  zValidator("json", RestaurantCreateSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
     const restaurantKey = restaurantKeyById(restaurantId);
 
     const client = await initializeRedisClient();
-    const newData: Restaurant = c.req.valid("json");
+    const newData: RestaurantCreate = c.req.valid("json");
 
     const oldData = await client.hGetAll(restaurantKey);
     const updatedHashData = {
@@ -366,7 +404,7 @@ router.put(
   requireAuth,
   checkRestaurantExists,
   checkReviewExists,
-  zValidator("json", ReviewSchema),
+  zValidator("json", ReviewCreateSchema),
   async (c) => {
     const restaurantId = c.req.param("restaurantId");
     const restaurantKey = restaurantKeyById(restaurantId);
@@ -376,7 +414,7 @@ router.put(
     const reviewDetailsKey = reviewDetailsKeyById(reviewId);
 
     const client = await initializeRedisClient();
-    const newData: Review = c.req.valid("json");
+    const newData: ReviewCreate = c.req.valid("json");
 
     const existingReview = await client.hGetAll(reviewDetailsKey);
 
@@ -474,16 +512,40 @@ router.delete("/:restaurantId/reviews/:reviewId", checkRestaurantExists, async (
 
   const reviewKey = reviewKeyById(restaurantId);
   const reviewDetailsKey = reviewDetailsKeyById(reviewId);
+  const restaurantKey = restaurantKeyById(restaurantId);
+
+  const reviewToDelete = await client.hGetAll(reviewDetailsKey);
+
+  if (!reviewToDelete.id) {
+    return c.json(createErrorResponse("Review not found"), 404);
+  }
 
   const [removeResult, deleteResult] = await Promise.all([
     client.lRem(reviewKey, 0, reviewId),
     client.del(reviewDetailsKey),
   ]);
 
-  if (removeResult === 0 && deleteResult === 0) {
-    const errorBody = createErrorResponse("Review not found");
-    return c.json(errorBody, 404);
-  }
+  const deletedRating = parseFloat(reviewToDelete.rating || "0");
+
+  const newTotalStarsString = await client.hIncrByFloat(
+    restaurantKey,
+    "totalStars",
+    -deletedRating
+  );
+
+  const newReviewCount = await client.lLen(reviewKey);
+  const newTotalStars = parseFloat(newTotalStarsString);
+  const averageRating = newReviewCount === 0
+    ? 0
+    : Number((newTotalStars / newReviewCount).toFixed(1));
+  
+  await Promise.all([
+    client.hSet(restaurantKey, "avgStars", averageRating),
+    client.zAdd(restaurantsByRatingKey, {
+      score: averageRating,
+      value: restaurantId,
+    }),
+  ]);
 
   await publishRestaurantUpdate(client, {
     type: "REVIEW_DELETED",
@@ -525,15 +587,20 @@ router.get("/:restaurantId", checkRestaurantExists, async (c) => {
 
   const restaurantKey = restaurantKeyById(restaurantId);
 
-  const [viewCount, restaurantData, cuisines] = await Promise.all([
+  const [viewCount, restaurantRawData, cuisines] = await Promise.all([
     client.hIncrBy(restaurantKey, "viewCount", 1),
     client.hGetAll(restaurantKey),
     client.sMembers(restaurantCuisinesKeyById(restaurantId)),
   ]);
 
-  const responseBody = createSuccessResponse({
-    ...restaurantData,
+  const validatedData = RestaurantResponseSchema.parse({
+    ...restaurantRawData,
+    viewCount,
     cuisines,
+  });
+
+  const responseBody = createSuccessResponse({
+    validatedData,
   });
   return c.json(responseBody, 200);
 });
