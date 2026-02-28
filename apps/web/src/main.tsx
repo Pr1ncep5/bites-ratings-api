@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./routeTree.gen.ts";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { AuthProvider, useAuth } from "./components/auth/auth-provider.tsx";
+import { ThemeProvider } from "./components/theme-provider.tsx";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +42,9 @@ if (!rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <InnerApp />
+          <ThemeProvider>
+            <InnerApp />
+          </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </StrictMode>,

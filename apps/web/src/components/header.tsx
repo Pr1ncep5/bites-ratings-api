@@ -10,7 +10,7 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { Bell, LogOut, Moon, Search, Settings, ShieldAlert, Sun, User } from "lucide-react";
+import { Bell, LogOut, Search, Settings, ShieldAlert, User } from "lucide-react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import {
@@ -25,6 +25,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import React from "react";
+import { ModeToggle } from "./theme-provider";
 
 const exploreItems: { title: string; href: string; description: string }[] = [
   {
@@ -97,11 +98,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="size-9">
-            <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-          </Button>
+          <ModeToggle />
 
           {user ? (
             <div className="flex items-center gap-4">
