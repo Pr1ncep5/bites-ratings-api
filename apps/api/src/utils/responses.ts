@@ -1,13 +1,4 @@
-export type SuccessResponse<T> = {
-  success: true;
-  message: string;
-  data: T;
-};
-
-export type ErrorResponse = {
-  success: false;
-  error: string;
-};
+import type { ErrorResponse, SuccessResponse } from "@bites-ratings/shared";
 
 export function createSuccessResponse<T>(
   data: T,
