@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/page-loader";
 import { ReviewForm } from "@/components/reviews/review-form";
+import { ReviewFeed } from "@/components/reviews/review-feed";
 
 export const Route = createFileRoute("/restaurants/$restaurantId")({
   component: RestaurantDetailPage,
@@ -155,9 +156,7 @@ function RestaurantDetailPage() {
         <TabsContent value="reviews" className="space-y-8">
           <ReviewForm restaurantId={restaurantId} />
 
-          <div className="py-12 text-center text-muted-foreground border rounded-xl border-dashed">
-            <p>TODO: Review feed coming later</p>
-          </div>
+          <ReviewFeed restaurantId={restaurantId} />
         </TabsContent>
       </Tabs>
     </div>
