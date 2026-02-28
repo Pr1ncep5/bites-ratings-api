@@ -42,7 +42,7 @@ if (!rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ThemeProvider>
+          <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
             <InnerApp />
           </ThemeProvider>
         </AuthProvider>
