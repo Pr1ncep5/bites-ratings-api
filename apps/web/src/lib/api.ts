@@ -1,5 +1,6 @@
 import type {
   PaginatedRestaurants,
+  RestaurantListItem,
   PaginatedReviews,
   RestaurantDetails,
   SuccessResponse,
@@ -27,15 +28,23 @@ export const getRestaurants = async (
   return res.json();
 };
 
-export const getCuisines = async (): Promise<SuccessResponse<string[]>> => {
-  const res = await fetch(`${API_URL}/cuisines`, { credentials: "include" });
-  if (!res.ok) throw new Error("Failed to fetch cuisines");
+export const getRestaurant = async (id: string): Promise<SuccessResponse<RestaurantListItem>> => {
+  const res = await fetch(`${API_URL}/restaurants/${id}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to fetch restaurant");
   return res.json();
 };
 
 export const getRestaurantDetails = async (id: string): Promise<SuccessResponse<RestaurantDetails>> => {
   const res = await fetch(`${API_URL}/restaurants/${id}/details`, { credentials: "include" });
   if (!res.ok) throw new Error("Failed to fetch details");
+  return res.json();
+};
+
+export const getCuisines = async (): Promise<SuccessResponse<string[]>> => {
+  const res = await fetch(`${API_URL}/cuisines`, { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to fetch cuisines");
   return res.json();
 };
 

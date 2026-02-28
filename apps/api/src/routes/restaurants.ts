@@ -145,9 +145,30 @@ router.get("/search", async (c) => {
   const { q } = c.req.query();
   const client = await initializeRedisClient();
 
-  const results = await client.ft.search(restaurantsIndexKey, `@name:${q}`);
+  const rawResults = await client.ft.search(restaurantsIndexKey, `@name:${q}*`);
 
-  const responseBody = createSuccessResponse(results);
+  if (rawResults.total === 0) {
+    return c.json(createSuccessResponse([]), 200);
+  }
+
+  const pipeline = client.multi();
+  rawResults.documents.forEach((doc) => {
+    const id = doc.value.id as string;
+    pipeline.sMembers(restaurantCuisinesKeyById(id));
+  });
+
+  const cuisineResults = await pipeline.exec();
+
+  const formattedResults = rawResults.documents.map((doc, index) => {
+    const cuisines = cuisineResults[index] as unknown as string[];
+
+    return RestaurantResponseSchema.parse({
+      ...doc.value,
+      cuisines,
+    });
+  });
+
+  const responseBody = createSuccessResponse(formattedResults);
   return c.json(responseBody, 200);
 });
 
@@ -320,9 +341,9 @@ router.get("/:restaurantId/reviews", checkRestaurantExists, async (c) => {
   const validatedReviews = reviews.map((raw) => ReviewResponseSchema.parse(raw));
 
   const responseBody = createSuccessResponse({
-    validatedReviews,
-    hasMoreReviews,
-    page: pageNum
+    reviews: validatedReviews,
+    hasMore: hasMoreReviews,
+    page: pageNum,
   }, "Reviews fetched");
 
   return c.json(responseBody, 200);
@@ -613,9 +634,7 @@ router.get("/:restaurantId", checkRestaurantExists, async (c) => {
     cuisines,
   });
 
-  const responseBody = createSuccessResponse({
-    validatedData,
-  });
+  const responseBody = createSuccessResponse(validatedData);
   return c.json(responseBody, 200);
 });
 

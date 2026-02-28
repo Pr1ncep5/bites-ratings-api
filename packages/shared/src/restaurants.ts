@@ -16,7 +16,7 @@ export const RestaurantResponseSchema = z.object({
     cuisines: z.array(z.string()),
 });
 
-export const RestaurantDetailsSchema = RestaurantResponseSchema.extend({
+export const RestaurantDetailsSchema = z.object({
     links: z.array(z.object({ name: z.string().min(1), url: z.string().min(1) })).optional(),
     contacts: z.object({ phone: z.string().min(1), email: z.email() }).optional(),
 });
