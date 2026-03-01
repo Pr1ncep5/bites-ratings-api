@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/page-loader";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { ReviewFeed } from "@/components/reviews/review-feed";
+import { useRestaurantWebSocket } from "@/hooks/use-restaurant-socket";
 
 export const Route = createFileRoute("/restaurants/$restaurantId")({
   component: RestaurantDetailPage,
@@ -15,6 +16,8 @@ export const Route = createFileRoute("/restaurants/$restaurantId")({
 
 function RestaurantDetailPage() {
   const { restaurantId } = Route.useParams();
+
+  useRestaurantWebSocket(restaurantId);
 
   const { data: restaurantRes, isLoading: isCoreLoading } = useQuery({
     queryKey: ["restaurant", restaurantId],
