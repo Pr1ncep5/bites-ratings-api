@@ -13,7 +13,7 @@ import {
   FieldLabel,
   FieldSeparator,
 } from "@/components/ui/field";
-import { authClient } from "@/lib/auth-client";
+import { authClient, signIn } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { Spinner } from "../ui/spinner";
@@ -118,7 +118,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<typeof C
                 variant="outline"
                 type="button"
                 className="w-full mt-2"
-                onClick={() => authClient.signIn.social({ provider: "github" as any })}
+                onClick={() => signIn()}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="mr-2 size-4">
                   <path
