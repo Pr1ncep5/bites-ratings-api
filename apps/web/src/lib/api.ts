@@ -87,3 +87,11 @@ export const createReview = async ({
 
   return res.json();
 };
+
+export const searchRestaurants = async (q: string): Promise<SuccessResponse<RestaurantListItem[]>> => {
+  const res = await fetch(`${API_URL}/restaurants/search?q=${encodeURIComponent(q)}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Search failed");
+  return res.json();
+};

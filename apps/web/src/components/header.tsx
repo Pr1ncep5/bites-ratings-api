@@ -10,8 +10,7 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { Bell, LogOut, Search, Settings, ShieldAlert, User } from "lucide-react";
-import { Input } from "./ui/input";
+import { Bell, LogOut, Settings, ShieldAlert, User } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -26,6 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cn } from "@/lib/utils";
 import React from "react";
 import { ModeToggle } from "./theme-provider";
+import { GlobalSearch } from "./global-search";
 
 const exploreItems: { title: string; href: string; description: string }[] = [
   {
@@ -86,13 +86,10 @@ export function Header() {
               </NavigationMenuList>
             </NavigationMenu>
 
-            <div className="relative hidden lg:flex items-center">
-              <Search className="absolute left-2.5 size-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search Bites..."
-                className="w-[200px] lg:w-[300px] pl-9 bg-muted/50 focus-visible:bg-background"
-              />
+            <div className="hidden lg:flex items-center">
+              <div className="flex items-center">
+                <GlobalSearch />
+              </div>
             </div>
           </div>
         </div>
