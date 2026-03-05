@@ -1,9 +1,10 @@
 import * as React from "react";
-import { Link, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { Link, Outlet, createRootRouteWithContext, useRouterState } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient } from "@tanstack/react-query";
 import type { AuthContextType } from "@/components/auth/auth-provider";
 import { Header } from "@/components/header";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -21,15 +22,22 @@ export const Route = createRootRouteWithContext<{
 });
 
 function RootComponent() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const isAdminRoute = pathname.startsWith("/admin");
+
   return (
     <React.Fragment>
-      <Toaster />
-      <div className="min-h-screen bg-background flex flex-col">
-        <Header />
-        <main className="flex-1 flex flex-col">
-          <Outlet />
-        </main>
-      </div>
+      <TooltipProvider>
+        <Toaster />
+        <div className="min-h-screen bg-background flex flex-col">
+          {!isAdminRoute && <Header />}
+          <main className="flex-1 flex flex-col">
+            <Outlet />
+          </main>
+        </div>
+      </TooltipProvider>
     </React.Fragment>
   );
 }

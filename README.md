@@ -1,12 +1,19 @@
 # Bites & Ratings API
 
-[![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Bun](https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white)](https://bun.sh/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Hono](https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white)](https://hono.dev/)
-[![Drizzle](https://img.shields.io/badge/Drizzle-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team/docs/overview)
-[![BetterAuth](https://img.shields.io/badge/BetterAuth-000000?logo=betterauth&logoColor=white)](https://www.better-auth.com/)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+<p align="left">
+  <a href="https://redis.io/"><img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis" height="20"></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-000000?logo=bun&logoColor=white" alt="Bun" height="20"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript" height="20"></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React" height="20"></a>
+  <a href="https://tanstack.com/router/latest"><img src="https://tanstack.com/images/logos/logo-word-white.svg" alt="TanStack Router" height="20"></a>
+  <a href="https://www.better-auth.com/"><img src="https://img.shields.io/badge/BetterAuth-000000?logo=betterauth&logoColor=white" alt="BetterAuth" height="20"></a>
+  <a href="https://orm.drizzle.team/docs/overview"><img src="https://img.shields.io/badge/Drizzle-C5F74F?logo=drizzle&logoColor=black" alt="Drizzle" height="20"></a>
+  <a href="https://hono.dev/"><img src="https://img.shields.io/badge/Hono-E36002?logo=hono&logoColor=white" alt="Hono" height="20"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker" height="20"></a>
+  <a href="https://sentry.io/"><img src="https://img.shields.io/badge/Sentry-362D59?logo=sentry&logoColor=white" alt="Sentry" height="20"></a>
+  <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" height="20"></a>
+  <a href="https://ui.shadcn.com/"><img src="https://img.shields.io/badge/shadcn%2Fui-000000?logo=shadcnui&logoColor=white" alt="Shadcn/ui" height="20"></a>
+</p>
 
 A high-performance RESTful API for restaurant management and review processing, built with Redis Stack as a multi-model primary database. This project demonstrates advanced data structures, sophisticated cache invalidation strategies, real-time WebSocket updates via Redis Pub/Sub, and type-safe database access with Drizzle ORM.
 
