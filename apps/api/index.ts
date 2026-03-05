@@ -12,8 +12,17 @@ import { sessionMiddleware } from "./src/middlewares/authMiddleware";
 import { initializePubSub } from "./src/pubsub/subscriber";
 import { websocket } from "hono/bun";
 import { cors } from "hono/cors";
+import * as Sentry from "@sentry/bun";
 
-const PORT = parseInt(process.env.PORT || "3000");
+if (process.env.BUN_ENV === "production") {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    enableLogs: true,
+    tracesSampleRate: 1.0, // Capture 100% of API performance traces
+  });
+}
+
+const PORT = parseInt(process.env.PORT!);
 
 const app = new Hono<{ Variables: AuthType }>({
   strict: false,
@@ -44,6 +53,10 @@ app.route("/notifications", notificationsRouter);
 
 app.onError((err, c) => {
   console.error(`Application Error: ${err.message}`, err.stack);
+
+  if (process.env.BUN_ENV === "production") {
+    Sentry.captureException(err);
+  }
 
   const errorBody = createErrorResponse("Internal Server Error");
 

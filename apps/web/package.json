@@ -4,13 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --open",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@bites-ratings/shared": "workspace:*",
+    "@sentry/react": "^10.42.0",
     "@tailwindcss/vite": "^4.2.0",
     "@tanstack/react-devtools": "^0.9.6",
     "@tanstack/react-form": "^1.28.3",
