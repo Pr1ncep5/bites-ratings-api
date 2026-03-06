@@ -16,17 +16,33 @@ async function createIndex() {
     {
       id: {
         type: SCHEMA_FIELD_TYPE.TEXT,
-        AS: "id",
+        AS: "id"
       },
       name: {
         type: SCHEMA_FIELD_TYPE.TEXT,
         AS: "name",
+        SORTABLE: true, 
+      },
+      location: {
+        type: SCHEMA_FIELD_TYPE.TEXT,
+        AS: "location",
+        SORTABLE: true,
+      },
+      ownerId: {
+        type: SCHEMA_FIELD_TYPE.TEXT,
+        AS: "ownerId",
+        SORTABLE: true,
       },
       avgStars: {
         type: SCHEMA_FIELD_TYPE.NUMERIC,
         AS: "avgStars",
         SORTABLE: true,
       },
+      viewCount: {
+        type: SCHEMA_FIELD_TYPE.NUMERIC,
+        AS: "viewCount",
+        SORTABLE: true,
+      }
     },
     {
       ON: "HASH",

@@ -2,6 +2,7 @@ export * from "./permissions";
 export * from "./responses";
 export * from "./restaurants";
 export * from "./reviews";
+export * from "./admin";
 
 export type WeatherDetails = {
     weather: {

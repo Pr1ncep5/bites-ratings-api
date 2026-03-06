@@ -1,17 +1,15 @@
-import * as z from "zod";
-import { sqliteTable, type AnySQLiteColumn, text, integer, numeric, index, foreignKey, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { sql } from "drizzle-orm"
+import { sqliteTable, text, integer, numeric, index, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 export const user = sqliteTable("user", {
   id: text().primaryKey().notNull(),
   name: text().notNull(),
   email: text().notNull(),
-  emailVerified: integer().notNull(),
+  emailVerified: integer({ mode: "boolean" }).notNull(),
   image: text(),
   createdAt: numeric().notNull(),
   updatedAt: numeric().notNull(),
   role: text(),
-  banned: integer(),
+  banned: integer({ mode: "boolean" }),
   banReason: text(),
   banExpires: numeric(),
 });
