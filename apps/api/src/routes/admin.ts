@@ -7,6 +7,18 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { initializeRedisClient } from "../utils/client";
 import { eventsStreamKey } from "../utils/keys";
+import { AdminUserListItemSchema } from "@bites-ratings/shared";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+
+const UpdateRoleSchema = z.object({
+  role: z.enum(["admin", "owner", "user"]),
+});
+
+const UpdateBanSchema = z.object({
+  banned: z.boolean(),
+  banReason: z.string().optional().nullable(),
+});
 
 const router = new Hono<{ Variables: AuthType }>();
 
@@ -35,8 +47,11 @@ router.get("/user-lookup", async (c) => {
 });
 
 router.get("/users", async (c) => {
-  const allUsers = await db.select().from(user);
-  return c.json(createSuccessResponse(allUsers, "All registered users retrieved, in total: " + allUsers.length));
+  const rawAllUsers = await db.select().from(user);
+
+  const allValidatedUsers = rawAllUsers.map((user) => AdminUserListItemSchema.parse(user));
+
+  return c.json(createSuccessResponse(allValidatedUsers, "All registered users retrieved, in total: " + allValidatedUsers.length));
 });
 
 router.get("/events", async (c) => {
@@ -67,5 +82,52 @@ router.get("/events", async (c) => {
     createSuccessResponse(events, `Latest ${events.length} domain events retrieved`),
   );
 });
+
+router.patch(
+  "/users/:id/role",
+  zValidator("json", UpdateRoleSchema),
+  async (c) => {
+    const id = c.req.param("id");
+    const { role } = c.req.valid("json");
+
+    const result = await db
+      .update(user)
+      .set({ role, updatedAt: new Date().toISOString() })
+      .where(eq(user.id, id))
+      .returning();
+
+    if (result.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    return c.json(createSuccessResponse(null, `User role successfully updated to ${role}`));
+  }
+);
+
+router.patch(
+  "/users/:id/ban",
+  zValidator("json", UpdateBanSchema),
+  async (c) => {
+    const id = c.req.param("id");
+    const { banned, banReason } = c.req.valid("json");
+
+    const result = await db
+      .update(user)
+      .set({
+        banned,
+        banReason: banned ? banReason : null,
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(user.id, id))
+      .returning();
+
+    if (result.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const statusStr = banned ? "banned" : "unbanned";
+    return c.json(createSuccessResponse(null, `User successfully ${statusStr}`));
+  }
+);
 
 export default router;

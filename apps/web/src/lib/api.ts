@@ -6,7 +6,8 @@ import type {
   SuccessResponse,
   WeatherDetails,
   ReviewCreate,
-  ReviewListItem
+  ReviewListItem,
+  AdminUserListItem
 } from "@bites-ratings/shared";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -93,5 +94,35 @@ export const searchRestaurants = async (q: string): Promise<SuccessResponse<Rest
     credentials: "include",
   });
   if (!res.ok) throw new Error("Search failed");
+  return res.json();
+};
+
+export const getUsersForAdmin = async (): Promise<SuccessResponse<AdminUserListItem[]>> => {
+  const res = await fetch(`${API_URL}/admin/users`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to fetch users list for admin");
+  return res.json();
+};
+
+export const updateUserRole = async ({ id, role }: { id: string; role: "admin" | "owner" | "user" }) => {
+  const res = await fetch(`${API_URL}/admin/users/${id}/role`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error("Failed to update role");
+  return res.json();
+};
+
+export const updateUserBan = async ({ id, banned, banReason }: { id: string; banned: boolean; banReason?: string }) => {
+  const res = await fetch(`${API_URL}/admin/users/${id}/ban`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ banned, banReason }),
+  });
+  if (!res.ok) throw new Error("Failed to update ban status");
   return res.json();
 };
