@@ -7,7 +7,8 @@ import type {
   WeatherDetails,
   ReviewCreate,
   ReviewListItem,
-  AdminUserListItem
+  AdminUserListItem,
+  RestaurantCreate,
 } from "@bites-ratings/shared";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -124,5 +125,53 @@ export const updateUserBan = async ({ id, banned, banReason }: { id: string; ban
     body: JSON.stringify({ banned, banReason }),
   });
   if (!res.ok) throw new Error("Failed to update ban status");
+  return res.json();
+};
+
+export const getRestaurantsForAdmin = async (): Promise<SuccessResponse<RestaurantListItem[]>> => {
+  const res = await fetch(`${API_URL}/admin/restaurants`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("Failed to fetch restaurants for admin");
+  return res.json();
+};
+
+export const createRestaurant = async (data: RestaurantCreate) => {
+  const res = await fetch(`${API_URL}/restaurants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to create restaurant");
+  }
+  return res.json();
+};
+
+export const updateRestaurant = async ({ id, data }: { id: string; data: RestaurantCreate }) => {
+  const res = await fetch(`${API_URL}/restaurants/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to update restaurant");
+  }
+  return res.json();
+};
+
+export const deleteRestaurant = async (id: string) => {
+  const res = await fetch(`${API_URL}/restaurants/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to delete restaurant");
+  }
   return res.json();
 };

@@ -6,8 +6,8 @@ import { user } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { initializeRedisClient } from "../utils/client";
-import { eventsStreamKey } from "../utils/keys";
-import { AdminUserListItemSchema } from "@bites-ratings/shared";
+import { eventsStreamKey, restaurantsIndexKey, restaurantCuisinesKeyById } from "../utils/keys";
+import { AdminUserListItemSchema, RestaurantResponseSchema } from "@bites-ratings/shared";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
@@ -52,6 +52,37 @@ router.get("/users", async (c) => {
   const allValidatedUsers = rawAllUsers.map((user) => AdminUserListItemSchema.parse(user));
 
   return c.json(createSuccessResponse(allValidatedUsers, "All registered users retrieved, in total: " + allValidatedUsers.length));
+});
+
+router.get("/restaurants", async (c) => {
+  const client = await initializeRedisClient();
+
+  const rawResults = await client.ft.search(restaurantsIndexKey, "*", {
+    LIMIT: { from: 0, size: 1000 },
+  });
+
+  if (rawResults.total === 0) {
+    return c.json(createSuccessResponse([], "No restaurants found"));
+  }
+
+  const pipeline = client.multi();
+  
+  rawResults.documents.forEach((doc) => {
+    const id = doc.id.split(":").pop()!;
+    pipeline.sMembers(restaurantCuisinesKeyById(id));
+  });
+
+  const cuisineResults = await pipeline.exec();
+
+  const formattedResults = rawResults.documents.map((doc, index) => {
+    const cuisines = cuisineResults[index] as unknown as string[];
+    return RestaurantResponseSchema.parse({
+      ...doc.value,
+      cuisines,
+    });
+  });
+
+  return c.json(createSuccessResponse(formattedResults, "Admin restaurants retrieved"));
 });
 
 router.get("/events", async (c) => {
