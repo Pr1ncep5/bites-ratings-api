@@ -52,6 +52,22 @@ export function getRestaurantColumns({
       cell: ({ row }) => <span className="font-medium">{row.getValue("name")}</span>,
     },
     {
+      accessorKey: "status",
+      header: () => (
+        <span className="text-primary text-xs font-semibold tracking-wide uppercase">Status</span>
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        const variant =
+          status === "active" ? "default" : status === "deleted" ? "destructive" : "secondary";
+        return (
+          <Badge variant={variant} className="capitalize text-xs">
+            {status.replace("_", " ")}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: "location",
       header: ({ column }) => <SortableHeader label="Location" column={column} />,
     },
@@ -66,7 +82,7 @@ export function getRestaurantColumns({
           <div className="flex flex-wrap gap-1">
             {cuisines.length > 0 ? (
               cuisines.map((c) => (
-                <Badge key={c} variant="secondary" className="text-xs">
+                <Badge key={c} variant="secondary" className="text-xs capitalize">
                   {c}
                 </Badge>
               ))

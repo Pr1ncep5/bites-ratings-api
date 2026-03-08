@@ -68,7 +68,7 @@ function RestaurantDetailPage() {
           {restaurant.cuisines?.length > 0 && (
             <div className="flex gap-2 mt-4">
               {restaurant.cuisines.map((cuisine) => (
-                <Badge key={cuisine} variant="secondary">
+                <Badge key={cuisine} variant="secondary" className="capitalize">
                   {cuisine}
                 </Badge>
               ))}

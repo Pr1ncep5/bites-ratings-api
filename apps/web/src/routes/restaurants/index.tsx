@@ -76,7 +76,7 @@ function RestaurantsIndexPage() {
               size="sm"
               onClick={() => setSelectedCuisine(selectedCuisine === cuisine ? undefined : cuisine)}
               className={cn(
-                "rounded-full shrink-0 border",
+                "rounded-full shrink-0 border capitalize",
                 selectedCuisine === cuisine
                   ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground"
                   : "border-border",

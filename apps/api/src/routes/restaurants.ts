@@ -48,7 +48,7 @@ router.get("/", async (c) => {
   let hasMore: boolean;
 
   if (cuisine) {
-    const cuisineIds = await client.sMembers(cuisineKey(cuisine));
+    const cuisineIds = await client.sMembers(cuisineKey(cuisine.toLowerCase()));
     const scores = await Promise.all(
       cuisineIds.map((id) => client.zScore(restaurantsByRatingKey, id)),
     );
@@ -112,18 +112,29 @@ router.post(
     const hasSeenBefore = await client.bf.exists(restaurantsBloomKey, bloomString);
 
     if (hasSeenBefore) {
-      return c.json(createErrorResponse("This restaurant already exists"), 409);
+      return c.json(
+        createErrorResponse(
+          "This restaurant already exists (or was previously deleted at this location)",
+        ),
+        409,
+      );
     }
+
+    const normalizedCuisines = validatedData.cuisines.map((c) => c.toLowerCase());
 
     const hashData = {
       id: id,
       name: validatedData.name,
       location: validatedData.location,
       ownerId: user.id,
+      avgStars: "0",
+      totalStars: "0",
+      viewCount: "0",
+      status: "active",
     };
 
     await Promise.all([
-      ...validatedData.cuisines.map((cuisine) =>
+      ...normalizedCuisines.map((cuisine) =>
         Promise.all([
           client.sAdd(cuisinesKey, cuisine),
           client.sAdd(cuisineKey(cuisine), id),
@@ -151,7 +162,7 @@ router.get("/search", async (c) => {
   const { q } = c.req.query();
   const client = await initializeRedisClient();
 
-  const rawResults = await client.ft.search(restaurantsIndexKey, `@name:${q}*`);
+  const rawResults = await client.ft.search(restaurantsIndexKey, `@name:${q}* @status:{active}`);
 
   if (rawResults.total === 0) {
     return c.json(createSuccessResponse([]), 200);
@@ -416,7 +427,7 @@ router.put(
 
     const restaurantCuisinesKey = restaurantCuisinesKeyById(restaurantId);
     const oldCuisines = await client.sMembers(restaurantCuisinesKey);
-    const newCuisines = newData.cuisines;
+    const newCuisines = newData.cuisines.map((c) => c.toLowerCase());
 
     const cuisinesToAdd = newCuisines.filter((c) => !oldCuisines.includes(c));
     const cuisinesToRemove = oldCuisines.filter((c) => !newCuisines.includes(c));
@@ -479,39 +490,41 @@ router.put(
   },
 );
 
-router.delete("/:restaurantId", requireAuth, requireRole("admin"), checkRestaurantExists, async (c) => {
-  const client = await initializeRedisClient();
-  const restaurantId = c.req.param("restaurantId");
+router.patch(
+  "/:restaurantId/status",
+  requireAuth,
+  requireRole("admin"),
+  checkRestaurantExists,
+  async (c) => {
+    const client = await initializeRedisClient();
+    const restaurantId = c.req.param("restaurantId");
+    const restaurantKey = restaurantKeyById(restaurantId);
 
-  const restaurantCuisinesKey = restaurantCuisinesKeyById(restaurantId);
-  const reviewListKey = reviewKeyById(restaurantId);
+    const restaurantCuisinesKey = restaurantCuisinesKeyById(restaurantId);
+    const cuisines = await client.sMembers(restaurantCuisinesKey);
 
-  const [cuisines, reviewIds] = await Promise.all([
-    client.sMembers(restaurantCuisinesKey),
-    client.lRange(reviewListKey, 0, -1),
-  ]);
+    const pipeline = client.multi();
 
-  const pipeline = client.multi();
+    pipeline.hSet(restaurantKey, "status", "deleted");
 
-  pipeline.del(restaurantKeyById(restaurantId));
-  pipeline.del(restaurantDetailsKeyById(restaurantId));
-  pipeline.del(weatherKeyById(restaurantId));
-  pipeline.del(restaurantCuisinesKey);
-  pipeline.zRem(restaurantsByRatingKey, restaurantId);
+    pipeline.zRem(restaurantsByRatingKey, restaurantId);
 
-  cuisines.forEach((cuisine) => {
-    pipeline.sRem(cuisineKey(cuisine), restaurantId);
-  });
+    cuisines.forEach((cuisine) => {
+      pipeline.sRem(cuisineKey(cuisine), restaurantId);
+    });
 
-  pipeline.del(reviewListKey);
-  reviewIds.forEach((reviewId) => {
-    pipeline.del(reviewDetailsKeyById(reviewId));
-  });
+    await pipeline.exec();
 
-  await pipeline.exec();
+    for (const cuisine of cuisines) {
+      const remaining = await client.sCard(cuisineKey(cuisine));
+      if (remaining === 0) {
+        await client.sRem(cuisinesKey, cuisine);
+      }
+    }
 
-  return c.json(createSuccessResponse("Restaurant and all related data was deleted"), 200);
-});
+    return c.json(createSuccessResponse(null, "Restaurant soft-deleted successfully"), 200);
+  },
+);
 
 router.put(
   "/:restaurantId/reviews/:reviewId",

@@ -60,7 +60,7 @@ export const getRestaurantWeather = async (id: string): Promise<SuccessResponse<
 
 export const getReviews = async (id: string, page = 1): Promise<SuccessResponse<PaginatedReviews>> => {
   const res = await fetch(`${API_URL}/restaurants/${id}/reviews?page=${page}&limit=10`, {
-    credentials: "include"
+    credentials: "include",
   });
   if (!res.ok) throw new Error("Failed to fetch reviews");
   return res.json();
@@ -164,10 +164,12 @@ export const updateRestaurant = async ({ id, data }: { id: string; data: Restaur
   return res.json();
 };
 
-export const deleteRestaurant = async (id: string) => {
-  const res = await fetch(`${API_URL}/restaurants/${id}`, {
-    method: "DELETE",
+export const softDeleteRestaurant = async (id: string) => {
+  const res = await fetch(`${API_URL}/restaurants/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     credentials: "include",
+    body: JSON.stringify({ status: "deleted" }),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));

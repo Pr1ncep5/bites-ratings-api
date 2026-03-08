@@ -1,5 +1,7 @@
 import z from "zod";
 
+export const RestaurantStatusEnum = z.enum(["active", "permanently_closed", "deleted"]);
+
 export const RestaurantCreateSchema = z.object({
   name: z.string().min(1),
   location: z.string().min(1),
@@ -15,6 +17,7 @@ export const RestaurantResponseSchema = z.object({
   totalStars: z.coerce.number().default(0),
   viewCount: z.coerce.number().default(0),
   cuisines: z.array(z.string()),
+  status: RestaurantStatusEnum.default("active"),
 });
 
 export const RestaurantDetailsSchema = z.object({
@@ -25,6 +28,7 @@ export const RestaurantDetailsSchema = z.object({
 export type RestaurantCreate = z.infer<typeof RestaurantCreateSchema>;
 export type RestaurantListItem = z.infer<typeof RestaurantResponseSchema>;
 export type RestaurantDetails = z.infer<typeof RestaurantDetailsSchema>;
+export type RestaurantStatus = z.infer<typeof RestaurantStatusEnum>;
 
 export type PaginatedRestaurants = {
   restaurants: RestaurantListItem[];

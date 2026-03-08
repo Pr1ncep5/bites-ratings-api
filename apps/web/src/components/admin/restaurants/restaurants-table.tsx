@@ -3,7 +3,7 @@ import {
   getRestaurantsForAdmin,
   createRestaurant,
   updateRestaurant,
-  deleteRestaurant,
+  softDeleteRestaurant,
 } from "@/lib/api";
 import { DataTable } from "@/components/ui/data-table";
 import { getRestaurantColumns } from "./columns";
@@ -61,9 +61,9 @@ export function RestaurantsTable() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deleteRestaurant,
+    mutationFn: softDeleteRestaurant,
     onSuccess: () => {
-      toast.success("Restaurant deleted successfully.");
+      toast.success("Restaurant marked as deleted.");
       queryClient.invalidateQueries({ queryKey: ["admin", "restaurants"] });
       setDeletingRestaurant(null);
     },
@@ -149,8 +149,8 @@ export function RestaurantsTable() {
             <AlertDialogTitle>Delete restaurant?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete{" "}
-              <span className="font-semibold">{deletingRestaurant?.name}</span>? This will
-              permanently remove the restaurant and all its reviews. This action cannot be undone.
+              <span className="font-semibold">{deletingRestaurant?.name}</span>? The restaurant will
+              be marked as deleted and hidden from public view. Reviews and data are preserved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

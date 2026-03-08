@@ -16,12 +16,12 @@ async function createIndex() {
     {
       id: {
         type: SCHEMA_FIELD_TYPE.TEXT,
-        AS: "id"
+        AS: "id",
       },
       name: {
         type: SCHEMA_FIELD_TYPE.TEXT,
         AS: "name",
-        SORTABLE: true, 
+        SORTABLE: true,
       },
       location: {
         type: SCHEMA_FIELD_TYPE.TEXT,
@@ -42,12 +42,16 @@ async function createIndex() {
         type: SCHEMA_FIELD_TYPE.NUMERIC,
         AS: "viewCount",
         SORTABLE: true,
-      }
+      },
+      status: {
+        type: SCHEMA_FIELD_TYPE.TAG,
+        AS: "status",
+      },
     },
     {
       ON: "HASH",
       PREFIX: getKeyName("restaurants"),
-    }
+    },
   );
 }
 

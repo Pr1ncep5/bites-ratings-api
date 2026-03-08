@@ -16,7 +16,9 @@ export const checkRestaurantExists: MiddlewareHandler = async (c, next) => {
 
   const exists = await client.exists(restaurantKey);
 
-  if (!exists) {
+  const restaurantStatus = await client.hGet(restaurantKey, "status");
+
+  if (!exists || restaurantStatus === "deleted") {
     const errorBody = createErrorResponse("Restaurant not found");
     return c.json(errorBody, 404);
   }
