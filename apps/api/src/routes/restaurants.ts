@@ -108,7 +108,10 @@ router.post(
     const id = nanoid();
     const restaurantKey = restaurantKeyById(id);
 
-    const bloomString = `${validatedData.name}:${validatedData.location}`;
+    const normalizedName = validatedData.name.trim();
+    const normalizedLocation = validatedData.location.trim();
+    
+    const bloomString = `${normalizedName.toLowerCase()}:${normalizedLocation.toLowerCase()}`;
     const hasSeenBefore = await client.bf.exists(restaurantsBloomKey, bloomString);
 
     if (hasSeenBefore) {
@@ -124,8 +127,8 @@ router.post(
 
     const hashData = {
       id: id,
-      name: validatedData.name,
-      location: validatedData.location,
+      name: normalizedName,
+      location: normalizedLocation,
       ownerId: user.id,
       avgStars: "0",
       totalStars: "0",

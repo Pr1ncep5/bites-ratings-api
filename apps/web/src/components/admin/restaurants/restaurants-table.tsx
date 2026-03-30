@@ -93,14 +93,6 @@ export function RestaurantsTable() {
     [],
   );
 
-  if (isLoading) {
-    return <PageLoader />;
-  }
-
-  if (isError) {
-    return <div className="text-red-500">Failed to load restaurants.</div>;
-  }
-
   const isDeleteSubmitting = deleteMutation.isPending;
 
   return (
@@ -112,28 +104,39 @@ export function RestaurantsTable() {
         </Button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={restaurants?.data || []}
-        searchPlaceholder="Search restaurants..."
-      />
+      {isLoading ? (
+        <PageLoader />
+      ) : isError ? (
+        <div className="text-red-500">Failed to load restaurants. You can still add a new one.</div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={restaurants?.data || []}
+          searchPlaceholder="Search restaurants..."
+        />
+      )}
 
       <RestaurantFormDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
+        serverError={createMutation.error?.message}
       />
 
       <RestaurantFormDialog
         key={editingRestaurant?.id ?? "create"}
         open={Boolean(editingRestaurant)}
         onOpenChange={(open) => {
-          if (!open) setEditingRestaurant(null);
+          if (!open) {
+            setEditingRestaurant(null);
+            updateMutation.reset();
+          }
         }}
         onSubmit={handleUpdate}
         isSubmitting={updateMutation.isPending}
         initialData={editingRestaurant}
+        serverError={updateMutation.error?.message}
       />
 
       <AlertDialog

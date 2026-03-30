@@ -21,6 +21,7 @@ type RestaurantFormDialogProps = {
   onSubmit: (data: RestaurantCreate) => void;
   isSubmitting: boolean;
   initialData?: RestaurantListItem | null;
+  serverError?: string | null;
 };
 
 export function RestaurantFormDialog({
@@ -29,6 +30,7 @@ export function RestaurantFormDialog({
   onSubmit,
   isSubmitting,
   initialData,
+  serverError,
 }: RestaurantFormDialogProps) {
   const isEditing = Boolean(initialData);
   const [cuisineInput, setCuisineInput] = useState("");
@@ -48,10 +50,23 @@ export function RestaurantFormDialog({
     state: { value: string[] };
     handleChange: (value: string[]) => void;
   }) => {
-    const trimmed = cuisineInput.trim();
-    if (trimmed && !cuisinesField.state.value.includes(trimmed)) {
-      cuisinesField.handleChange([...cuisinesField.state.value, trimmed]);
+    const incoming = cuisineInput
+      .split(",")
+      .map((value) => {
+        const trimmed = value.trim();
+        if (!trimmed) return "";
+        
+        return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+      })
+      .filter(Boolean);
+
+    const existingLowerCase = new Set(cuisinesField.state.value.map((value) => value.toLowerCase()));
+    const uniqueIncoming = incoming.filter((value) => !existingLowerCase.has(value.toLowerCase()));
+
+    if (uniqueIncoming.length > 0) {
+      cuisinesField.handleChange([...cuisinesField.state.value, ...uniqueIncoming]);
     }
+
     setCuisineInput("");
   };
 
@@ -223,6 +238,9 @@ export function RestaurantFormDialog({
           </form.Field>
 
           <DialogFooter>
+            {serverError ? (
+              <p className="text-[0.8rem] font-medium text-destructive">{serverError}</p>
+            ) : null}
             <Button
               type="button"
               variant="outline"

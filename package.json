@@ -8,10 +8,11 @@
   "scripts": {
     "dev": "concurrently -k \"bun run dev:api\" \"bun run dev:web\"",
     "dev:api": "bun --cwd apps/api dev",
-    "dev:web": "bun --cwd apps/web dev",
+    "dev:web": "wait-on tcp:3000 && bun --cwd apps/web dev",
     "build": "bun run --filter '*' build"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "wait-on": "^9.0.4"
   }
 }

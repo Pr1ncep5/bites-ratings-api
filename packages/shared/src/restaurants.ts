@@ -3,9 +3,9 @@ import z from "zod";
 export const RestaurantStatusEnum = z.enum(["active", "permanently_closed", "deleted"]);
 
 export const RestaurantCreateSchema = z.object({
-  name: z.string().min(1),
-  location: z.string().min(1),
-  cuisines: z.array(z.string().min(1)),
+  name: z.string().trim().min(1),
+  location: z.string().trim().min(1),
+  cuisines: z.array(z.string().trim().min(1)).min(1, "At least one cuisine is required"),
 });
 
 export const RestaurantResponseSchema = z.object({
