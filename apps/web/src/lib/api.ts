@@ -9,7 +9,7 @@ import type {
   ReviewListItem,
   AdminUserListItem,
   RestaurantCreate,
-  ErrorResponse,
+  ErrorResponse
 } from "@bites-ratings/shared";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -25,6 +25,7 @@ const getErrorMessage = async (res: Response, fallback: string) => {
 export const getRestaurants = async (
   page: number,
   cuisine?: string,
+  location?: { latitude: number; longitude: number; radiusKm?: number },
 ): Promise<SuccessResponse<PaginatedRestaurants>> => {
   const params = new URLSearchParams({ page: String(page), limit: "10" });
 
@@ -32,7 +33,15 @@ export const getRestaurants = async (
     params.set("cuisine", cuisine);
   }
 
-  const res = await fetch(`${API_URL}/restaurants?${params}`, {
+  if (location) {
+    params.set("latitude", String(location.latitude));
+    params.set("longitude", String(location.longitude));
+    params.set("radiusKm", String(location.radiusKm ?? 5));
+  }
+
+  const endpoint = location ? "/restaurants/near" : "/restaurants";
+  
+  const res = await fetch(`${API_URL}${endpoint}?${params}`, {
     credentials: "include",
   });
 

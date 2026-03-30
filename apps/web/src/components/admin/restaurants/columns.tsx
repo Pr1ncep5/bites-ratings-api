@@ -68,8 +68,8 @@ export function getRestaurantColumns({
       },
     },
     {
-      accessorKey: "location",
-      header: ({ column }) => <SortableHeader label="Location" column={column} />,
+      accessorKey: "address",
+      header: ({ column }) => <SortableHeader label="Address" column={column} />,
     },
     {
       accessorKey: "cuisines",

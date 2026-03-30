@@ -61,7 +61,7 @@ function RestaurantDetailPage() {
             </div>
             <div className="flex items-center gap-1.5 text-sm">
               <MapPin className="size-4" />
-              <span>{restaurant.location}</span>
+              <span>{restaurant.address}</span>
             </div>
           </div>
 
@@ -98,7 +98,7 @@ function RestaurantDetailPage() {
             <h2 className="text-2xl font-bold">About</h2>
             <p className="text-muted-foreground">
               A fantastic {restaurant.cuisines[0]?.toLowerCase() || "local"} dining experience
-              located at coordinates {restaurant.location}.
+              located at {restaurant.address}.
             </p>
           </div>
 

@@ -14,7 +14,7 @@ export interface AdminPaginatedResult<T> {
 
 export type AdminRestaurantSortBy = Extract<
   keyof RestaurantListItem,
-  "name" | "location" | "ownerId" | "avgStars" | "viewCount"
+  "name" | "address" | "ownerId" | "avgStars" | "viewCount"
 >;
 
 export const AdminUserListItemSchema = z.object({

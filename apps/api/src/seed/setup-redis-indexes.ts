@@ -23,10 +23,18 @@ async function createIndex() {
         AS: "name",
         SORTABLE: true,
       },
-      location: {
+      address: {
         type: SCHEMA_FIELD_TYPE.TEXT,
-        AS: "location",
+        AS: "address",
         SORTABLE: true,
+      },
+      geo: {
+        type: SCHEMA_FIELD_TYPE.GEO,
+        AS: "geo",
+      },
+      cuisineTags: {
+        type: SCHEMA_FIELD_TYPE.TAG,
+        AS: "cuisineTags",
       },
       ownerId: {
         type: SCHEMA_FIELD_TYPE.TEXT,

@@ -9,6 +9,10 @@ import {
   type RestaurantCreate,
   type RestaurantDetails,
   type ReviewCreate,
+  type RestaurantListItem,
+  type RawRedisDocument,
+  type PaginatedRestaurants,
+  parseRedisRestaurant,
 } from "@bites-ratings/shared";
 import { initializeRedisClient } from "../utils/client";
 import { nanoid } from "nanoid";
@@ -33,6 +37,7 @@ import { publishRestaurantUpdate } from "../pubsub/channels";
 import { appendDomainEvent } from "../streams/events";
 import { notifyFollowers } from "../notifications/service";
 import type { AuthType } from "../lib/auth";
+import { escapeRedisTag, escapeRedisText } from "../utils/redis";
 
 const router = new Hono<{ Variables: AuthType }>();
 
@@ -256,13 +261,16 @@ router.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
     return c.json(createSuccessResponse(JSON.parse(cachedWeather)), 200);
   }
 
-  const coords = await client.hGet(restaurantKey, "location");
-  if (!coords) {
+  const [longitude, latitude] = await Promise.all([
+    client.hGet(restaurantKey, "longitude"),
+    client.hGet(restaurantKey, "latitude"),
+  ]);
+  
+  if (!longitude || !latitude) {
     const responseBody = createErrorResponse("Coordinates haven't been found");
     return c.json(responseBody, 404);
   }
 
-  const [longitude, latitude] = coords.split(",");
   const apiResponse = await fetch(
     `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${process.env.WEATHER_API_KEY}`,
   );
@@ -420,25 +428,35 @@ router.put(
     }
 
     const oldData = existingData;
+    const normalizedAddress = newData.address.trim();
+    const latitude = newData.latitude;
+    const longitude = newData.longitude;
+    const geo = `${longitude},${latitude}`;
+    const normalizedCuisines = newData.cuisines.map((c) => c.toLowerCase());
+
     const updatedHashData = {
       ...oldData,
-      name: newData.name,
-      location: newData.location,
+      name: newData.name.trim(),
+      address: normalizedAddress,
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      geo,
+      cuisineTags: normalizedCuisines.join(","),
     };
 
-    const hasLocationChanged = oldData.location !== newData.location;
+    const hasCoordinatesChanged = oldData.latitude !== latitude.toString() || oldData.longitude !== longitude.toString();
 
     const restaurantCuisinesKey = restaurantCuisinesKeyById(restaurantId);
     const oldCuisines = await client.sMembers(restaurantCuisinesKey);
-    const newCuisines = newData.cuisines.map((c) => c.toLowerCase());
+    const newCuisines = normalizedCuisines;
 
     const cuisinesToAdd = newCuisines.filter((c) => !oldCuisines.includes(c));
     const cuisinesToRemove = oldCuisines.filter((c) => !newCuisines.includes(c));
 
     const operations = [client.hSet(restaurantKey, updatedHashData)];
 
-    if (hasLocationChanged) {
-      console.log("Location has changed, invalidating the weather cache");
+    if (hasCoordinatesChanged) {
+      console.log("Coordinates changed, invalidating the weather cache");
       operations.push(client.del(weatherKeyById(restaurantId)));
     }
 
@@ -470,7 +488,7 @@ router.put(
         entityType: "restaurant",
         payload: {
           restaurantId,
-          locationChanged: hasLocationChanged,
+          locationChanged: hasCoordinatesChanged,
           cuisinesAdded: cuisinesToAdd,
           cuisinesRemoved: cuisinesToRemove,
         },
@@ -483,7 +501,7 @@ router.put(
       restaurantId,
       data: {
         restaurantName: newData.name,
-        locationChanged: hasLocationChanged,
+        locationChanged: hasCoordinatesChanged,
       },
     }).catch((err) => console.error("Failed to notify followers:", err));
 

@@ -91,7 +91,7 @@ export function GlobalSearch() {
                   <div className="flex flex-col gap-1">
                     <span className="font-medium text-base">{restaurant.name}</span>
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <MapPin className="size-3" /> {restaurant.location}
+                      <MapPin className="size-3" /> {restaurant.address}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 font-medium">

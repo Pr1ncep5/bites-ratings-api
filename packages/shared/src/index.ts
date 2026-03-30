@@ -17,3 +17,23 @@ export type WeatherDetails = {
     };
     name: string;
 };
+
+export type GeocodedAddress = {
+    address: string;
+    latitude: number;
+    longitude: number;
+};
+
+export interface GoogleGeocodeResponse {
+    status: "OK" | "ZERO_RESULTS" | "OVER_QUERY_LIMIT" | "REQUEST_DENIED" | "INVALID_REQUEST" | "UNKNOWN_ERROR";
+    results: {
+        formatted_address: string;
+        geometry: {
+            location: {
+                lat: number;
+                lng: number;
+            };
+        };
+    }[];
+    error_message?: string;
+}

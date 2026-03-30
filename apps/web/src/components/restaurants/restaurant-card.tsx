@@ -70,7 +70,7 @@ export function RestaurantCard({ restaurant }: { restaurant: RestaurantListItem 
       <CardContent className="flex-1 pb-4">
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <MapPin className="size-3.5 shrink-0" />
-          <span className="truncate">Coordinates: {restaurant.location}</span>
+          <span className="truncate">{restaurant.address}</span>
         </div>
       </CardContent>
 
