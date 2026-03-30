@@ -40,59 +40,84 @@ import type { AuthType } from "../lib/auth";
 import { escapeRedisTag, escapeRedisText } from "../utils/redis";
 
 const router = new Hono<{ Variables: AuthType }>();
+const MAX_PAGE_SIZE = 100;
+const MAX_NEARBY_RESULTS = 2000;
+type PaginationResult =
+  | { ok: true; pageNum: number; limitNum: number; start: number }
+  | { ok: false; error: string };
+
+const parsePagination = (pageRaw: string, limitRaw: string): PaginationResult => {
+  const pageNum = Number(pageRaw);
+  const limitNum = Number(limitRaw);
+
+  if (
+    !Number.isFinite(pageNum) ||
+    !Number.isInteger(pageNum) ||
+    pageNum < 1 ||
+    !Number.isFinite(limitNum) ||
+    !Number.isInteger(limitNum) ||
+    limitNum < 1 ||
+    limitNum > MAX_PAGE_SIZE
+  ) {
+    return { ok: false, error: `Invalid pagination arguments (page >= 1, limit: 1-${MAX_PAGE_SIZE})` };
+  }
+
+  return {
+    ok: true,
+    pageNum,
+    limitNum,
+    start: (pageNum - 1) * limitNum,
+  };
+};
+
+const distanceInKm = (
+  fromLatitude: number,
+  fromLongitude: number,
+  toLatitude: number,
+  toLongitude: number,
+) => {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(toLatitude - fromLatitude);
+  const dLon = toRadians(toLongitude - fromLongitude);
+  const lat1 = toRadians(fromLatitude);
+  const lat2 = toRadians(toLatitude);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+};
 
 router.get("/", async (c) => {
   const client = await initializeRedisClient();
   const { page = "1", limit = "10", cuisine } = c.req.query();
 
-  const pageNum = Number(page);
-  const limitNum = Number(limit);
-  const start = (pageNum - 1) * limitNum;
-
-  let restaurantIds: string[];
-  let hasMore: boolean;
-
-  if (cuisine) {
-    const cuisineIds = await client.sMembers(cuisineKey(cuisine.toLowerCase()));
-    const scores = await Promise.all(
-      cuisineIds.map((id) => client.zScore(restaurantsByRatingKey, id)),
-    );
-    const sorted = cuisineIds
-      .map((id, i) => ({ id, score: scores[i] ?? 0 }))
-      .sort((a, b) => b.score - a.score);
-    restaurantIds = sorted.slice(start, start + limitNum).map((s) => s.id);
-    hasMore = sorted.length > start + limitNum;
-  } else {
-    const total = await client.zCard(restaurantsByRatingKey);
-    restaurantIds = await client.zRange(restaurantsByRatingKey, start, start + limitNum - 1, {
-      REV: true,
-    });
-    hasMore = total > start + limitNum;
+  const pagination = parsePagination(page ?? "1", limit ?? "10");
+  if (!pagination.ok) {
+    return c.json(createErrorResponse(pagination.error), 400);
   }
+  const { pageNum, limitNum, start } = pagination;
 
-  const pipeline = client.multi();
+  const cuisineFilter = cuisine ? ` @cuisineTags:{${escapeRedisTag(cuisine.toLowerCase())}}` : "";
+  const query = `@status:{active}${cuisineFilter}`;
 
-  restaurantIds.forEach((id) => {
-    pipeline.hGetAll(restaurantKeyById(id));
-    pipeline.sMembers(restaurantCuisinesKeyById(id));
+  const rawResults = await client.ft.search(restaurantsIndexKey, query, {
+    SORTBY: { BY: "avgStars", DIRECTION: "DESC" },
+    LIMIT: { from: start, size: limitNum },
   });
 
-  const results = await pipeline.exec();
+  const restaurants: RestaurantListItem[] = rawResults.documents.map((doc) => parseRedisRestaurant(doc.value as RawRedisDocument));
+  const hasMore = rawResults.total > start + limitNum;
 
-  const restaurants = [];
-  for (let i = 0; i < restaurantIds.length; i++) {
-    const rawData = results[i * 2] as unknown as Record<string, string>;
-    const cuisines = results[i * 2 + 1] as unknown as string[];
+  const payload: PaginatedRestaurants = {
+    restaurants,
+    hasMore,
+    page: pageNum
+  };
 
-    const validatedRestaurant = RestaurantResponseSchema.parse({
-      ...rawData,
-      cuisines,
-    });
-
-    restaurants.push(validatedRestaurant);
-  }
-
-  const responseBody = createSuccessResponse({ restaurants, hasMore, page: pageNum });
+  const responseBody = createSuccessResponse<PaginatedRestaurants>(payload);
   return c.json(responseBody, 200);
 });
 
@@ -114,9 +139,12 @@ router.post(
     const restaurantKey = restaurantKeyById(id);
 
     const normalizedName = validatedData.name.trim();
-    const normalizedLocation = validatedData.location.trim();
-    
-    const bloomString = `${normalizedName.toLowerCase()}:${normalizedLocation.toLowerCase()}`;
+    const normalizedAddress = validatedData.address.trim();
+    const latitude = validatedData.latitude;
+    const longitude = validatedData.longitude;
+    const geo = `${longitude},${latitude}`;
+
+    const bloomString = `${normalizedName.toLowerCase()}:${normalizedAddress.toLowerCase()}`;
     const hasSeenBefore = await client.bf.exists(restaurantsBloomKey, bloomString);
 
     if (hasSeenBefore) {
@@ -129,11 +157,16 @@ router.post(
     }
 
     const normalizedCuisines = validatedData.cuisines.map((c) => c.toLowerCase());
+    const cuisineTags = normalizedCuisines.join(",");
 
     const hashData = {
       id: id,
       name: normalizedName,
-      location: normalizedLocation,
+      address: normalizedAddress,
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
+      geo,
+      cuisineTags,
       ownerId: user.id,
       avgStars: "0",
       totalStars: "0",
@@ -167,33 +200,107 @@ router.post(
 );
 
 router.get("/search", async (c) => {
-  const { q } = c.req.query();
+  const { q = "" } = c.req.query();
+  const trimmedQuery = q.trim();
+  if (!trimmedQuery) {
+    return c.json(createSuccessResponse<RestaurantListItem[]>([], "Restaurants searched"), 200);
+  }
+
+  const safeSearchTerm = trimmedQuery
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => escapeRedisText(part))
+    .join("*");
   const client = await initializeRedisClient();
 
-  const rawResults = await client.ft.search(restaurantsIndexKey, `@name:${q}* @status:{active}`);
+  const rawResults = await client.ft.search(restaurantsIndexKey, `@name:${safeSearchTerm}* @status:{active}`);
 
   if (rawResults.total === 0) {
     return c.json(createSuccessResponse([]), 200);
   }
 
-  const pipeline = client.multi();
-  rawResults.documents.forEach((doc) => {
-    const id = doc.value.id as string;
-    pipeline.sMembers(restaurantCuisinesKeyById(id));
+  const formattedResults: RestaurantListItem[] = rawResults.documents.map((doc) =>
+    parseRedisRestaurant(doc.value as RawRedisDocument)
+  );
+  const responseBody = createSuccessResponse<RestaurantListItem[]>(formattedResults, "Restaurants searched");
+
+  return c.json(responseBody, 200);
+});
+
+router.get("/near", async (c) => {
+  const client = await initializeRedisClient();
+  const { latitude, longitude, radiusKm = "5", page = "1", limit = "10", cuisine } = c.req.query();
+
+  const parsedLatitude = Number(latitude);
+  const parsedLongitude = Number(longitude);
+  const parsedRadiusKm = Number(radiusKm);
+  const pagination = parsePagination(page ?? "1", limit ?? "10");
+  if (!pagination.ok) {
+    return c.json(createErrorResponse(pagination.error), 400);
+  }
+  const { pageNum, limitNum, start } = pagination;
+
+  if (
+    !Number.isFinite(parsedLatitude) ||
+    !Number.isFinite(parsedLongitude) ||
+    parsedLatitude < -90 ||
+    parsedLatitude > 90 ||
+    parsedLongitude < -180 ||
+    parsedLongitude > 180
+  ) {
+    return c.json(createErrorResponse("Valid latitude and longitude are required"), 400);
+  }
+
+  if (!Number.isFinite(parsedRadiusKm) || parsedRadiusKm <= 0 || parsedRadiusKm > 100) {
+    return c.json(createErrorResponse("Radius must be between 0 and 100 km"), 400);
+  }
+
+  const cuisineFilter = cuisine
+    ? ` @cuisineTags:{${escapeRedisTag(cuisine.toLowerCase())}}`
+    : "";
+  const query = `@geo:[${parsedLongitude} ${parsedLatitude} ${parsedRadiusKm} km] @status:{active}${cuisineFilter}`;
+
+  const rawResults = await client.ft.search(restaurantsIndexKey, query, {
+    LIMIT: { from: 0, size: MAX_NEARBY_RESULTS },
   });
 
-  const cuisineResults = await pipeline.exec();
+  if (rawResults.total === 0) {
+    return c.json(
+      createSuccessResponse({
+        restaurants: [],
+        hasMore: false,
+        page: pageNum,
+      }),
+      200,
+    );
+  }
 
-  const formattedResults = rawResults.documents.map((doc, index) => {
-    const cuisines = cuisineResults[index] as unknown as string[];
+  const formattedResults: RestaurantListItem[] = rawResults.documents.map((doc) =>
+    parseRedisRestaurant(doc.value as RawRedisDocument),
+  );
+  const distanceSortedRestaurants = formattedResults
+    .map((restaurant) => ({
+      restaurant,
+      distanceKm: distanceInKm(
+        parsedLatitude,
+        parsedLongitude,
+        restaurant.latitude,
+        restaurant.longitude,
+      ),
+    }))
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .map((item) => item.restaurant);
 
-    return RestaurantResponseSchema.parse({
-      ...doc.value,
-      cuisines,
-    });
-  });
+  const paginatedRestaurants = distanceSortedRestaurants.slice(start, start + limitNum);
 
-  const responseBody = createSuccessResponse(formattedResults);
+  const payload: PaginatedRestaurants = {
+    restaurants: paginatedRestaurants,
+    hasMore: distanceSortedRestaurants.length > start + limitNum || rawResults.total > MAX_NEARBY_RESULTS,
+    page: pageNum,
+  };
+
+  const responseBody = createSuccessResponse<PaginatedRestaurants>(payload);
+
   return c.json(responseBody, 200);
 });
 
@@ -203,17 +310,15 @@ router.get("/:restaurantId", checkRestaurantExists, async (c) => {
 
   const restaurantKey = restaurantKeyById(restaurantId);
 
-  const [viewCount, restaurantRawData, cuisines] = await Promise.all([
+  const [viewCount, restaurantRawData] = await Promise.all([
     client.hIncrBy(restaurantKey, "viewCount", 1),
     client.hGetAll(restaurantKey),
-    client.sMembers(restaurantCuisinesKeyById(restaurantId)),
   ]);
 
-  const validatedData = RestaurantResponseSchema.parse({
+  const validatedData = parseRedisRestaurant({
     ...restaurantRawData,
     viewCount,
-    cuisines,
-  });
+  } as RawRedisDocument);
 
   const responseBody = createSuccessResponse(validatedData);
   return c.json(responseBody, 200);
@@ -265,7 +370,7 @@ router.get("/:restaurantId/weather", checkRestaurantExists, async (c) => {
     client.hGet(restaurantKey, "longitude"),
     client.hGet(restaurantKey, "latitude"),
   ]);
-  
+
   if (!longitude || !latitude) {
     const responseBody = createErrorResponse("Coordinates haven't been found");
     return c.json(responseBody, 404);

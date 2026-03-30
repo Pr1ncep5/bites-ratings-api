@@ -13,7 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, X } from "lucide-react";
+import { geocodeAddress } from "@/lib/geocoding";
+import { Loader2, LocateFixed, X } from "lucide-react";
 
 type RestaurantFormDialogProps = {
   open: boolean;
@@ -34,50 +35,69 @@ export function RestaurantFormDialog({
 }: RestaurantFormDialogProps) {
   const isEditing = Boolean(initialData);
   const [cuisineInput, setCuisineInput] = useState("");
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [isAddressResolved, setIsAddressResolved] = useState(Boolean(initialData));
 
   const form = useForm({
     defaultValues: {
       name: initialData?.name ?? "",
-      location: initialData?.location ?? "",
+      address: initialData?.address ?? "",
+      latitude: initialData?.latitude ?? 0,
+      longitude: initialData?.longitude ?? 0,
       cuisines: initialData?.cuisines ?? ([] as string[]),
     },
     onSubmit: async ({ value }) => {
+      if (!isAddressResolved) {
+        setResolveError("Please click Resolve to convert the address to coordinates.");
+        return;
+      }
       onSubmit(value);
     },
   });
 
-  const handleAddCuisine = (cuisinesField: {
-    state: { value: string[] };
-    handleChange: (value: string[]) => void;
-  }) => {
+  const handleResolveAddress = async () => {
+    const address = form.state.values.address.trim();
+    if (!address) {
+      setResolveError("Please enter an address first.");
+      return;
+    }
+
+    setIsResolvingAddress(true);
+    setResolveError(null);
+    try {
+      const resolved = await geocodeAddress(address);
+      if (!resolved) {
+        setIsAddressResolved(false);
+        setResolveError("Could not resolve this address. Try a more specific one.");
+        return;
+      }
+
+      form.setFieldValue("address", resolved.address);
+      form.setFieldValue("latitude", Number(resolved.latitude.toFixed(6)));
+      form.setFieldValue("longitude", Number(resolved.longitude.toFixed(6)));
+      setIsAddressResolved(true);
+    } finally {
+      setIsResolvingAddress(false);
+    }
+  };
+
+  const handleAddCuisine = (cuisinesField: any) => {
     const incoming = cuisineInput
       .split(",")
       .map((value) => {
         const trimmed = value.trim();
-        if (!trimmed) return "";
-        
-        return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+        return trimmed ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase() : "";
       })
       .filter(Boolean);
 
-    const existingLowerCase = new Set(cuisinesField.state.value.map((value) => value.toLowerCase()));
-    const uniqueIncoming = incoming.filter((value) => !existingLowerCase.has(value.toLowerCase()));
+    const existing = new Set(cuisinesField.state.value.map((v: string) => v.toLowerCase()));
+    const unique = incoming.filter((v) => !existing.has(v.toLowerCase()));
 
-    if (uniqueIncoming.length > 0) {
-      cuisinesField.handleChange([...cuisinesField.state.value, ...uniqueIncoming]);
+    if (unique.length > 0) {
+      cuisinesField.handleChange([...cuisinesField.state.value, ...unique]);
     }
-
     setCuisineInput("");
-  };
-
-  const handleRemoveCuisine = (
-    cuisinesField: {
-      state: { value: string[] };
-      handleChange: (value: string[]) => void;
-    },
-    cuisine: string,
-  ) => {
-    cuisinesField.handleChange(cuisinesField.state.value.filter((c) => c !== cuisine));
   };
 
   return (
@@ -87,6 +107,8 @@ export function RestaurantFormDialog({
         if (!nextOpen && !isSubmitting) {
           form.reset();
           setCuisineInput("");
+          setResolveError(null);
+          setIsAddressResolved(Boolean(initialData));
           onOpenChange(false);
         }
       }}
@@ -94,159 +116,116 @@ export function RestaurantFormDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Restaurant" : "Add New Restaurant"}</DialogTitle>
-          <DialogDescription>
-            {isEditing
-              ? "Update the restaurant's details below."
-              : "Fill in the details to create a new restaurant."}
-          </DialogDescription>
+          <DialogDescription>Enter the restaurant details below.</DialogDescription>
         </DialogHeader>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            e.stopPropagation();
             form.handleSubmit();
           }}
           className="space-y-5"
         >
-          <form.Field
-            name="name"
-            validators={{
-              onChange: RestaurantCreateSchema.shape.name,
-            }}
-          >
+          {/* Name Field */}
+          <form.Field name="name" validators={{ onChange: RestaurantCreateSchema.shape.name }}>
             {(field) => (
               <div className="space-y-2">
-                <label htmlFor="restaurant-name" className="text-sm font-medium">
-                  Name
-                </label>
+                <label className="text-sm font-medium">Name</label>
                 <Input
-                  id="restaurant-name"
-                  placeholder="Restaurant name"
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
+                  placeholder="Pizza Palace"
                 />
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-[0.8rem] font-medium text-destructive">
-                    {field.state.meta.errors
-                      .map((e) =>
-                        typeof e === "object" && e !== null && "message" in e
-                          ? (e as { message: string }).message
-                          : String(e),
-                      )
-                      .join(", ")}
-                  </p>
-                )}
               </div>
             )}
           </form.Field>
 
+          {/* Address Field */}
           <form.Field
-            name="location"
-            validators={{
-              onChange: RestaurantCreateSchema.shape.location,
-            }}
+            name="address"
+            validators={{ onChange: RestaurantCreateSchema.shape.address }}
           >
             {(field) => (
               <div className="space-y-2">
-                <label htmlFor="restaurant-location" className="text-sm font-medium">
-                  Location
-                </label>
-                <Input
-                  id="restaurant-location"
-                  placeholder="e.g. 13.405,52.52"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                />
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-[0.8rem] font-medium text-destructive">
-                    {field.state.meta.errors
-                      .map((e) =>
-                        typeof e === "object" && e !== null && "message" in e
-                          ? (e as { message: string }).message
-                          : String(e),
-                      )
-                      .join(", ")}
-                  </p>
-                )}
-              </div>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="cuisines"
-            validators={{
-              onChange: RestaurantCreateSchema.shape.cuisines,
-            }}
-          >
-            {(field) => (
-              <div className="space-y-2">
-                <label htmlFor="restaurant-cuisines" className="text-sm font-medium">
-                  Cuisines
-                </label>
+                <label className="text-sm font-medium">Address</label>
                 <div className="flex gap-2">
                   <Input
-                    id="restaurant-cuisines"
-                    placeholder="Type a cuisine and press Enter"
-                    value={cuisineInput}
-                    onChange={(e) => setCuisineInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddCuisine(field);
-                      }
+                    value={field.state.value}
+                    onChange={(e) => {
+                      field.handleChange(e.target.value);
+                      setIsAddressResolved(false);
+                      setResolveError(null);
+                      form.setFieldValue("latitude", 0);
+                      form.setFieldValue("longitude", 0);
                     }}
+                    placeholder="Type full address, then click Resolve"
                   />
                   <Button
                     type="button"
                     variant="secondary"
-                    size="sm"
-                    onClick={() => handleAddCuisine(field)}
+                    onClick={handleResolveAddress}
+                    disabled={isResolvingAddress}
                   >
+                    {isResolvingAddress ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <LocateFixed className="mr-2 size-4" />
+                    )}
+                    Resolve
+                  </Button>
+                </div>
+                {field.state.meta.errors.length > 0 && (
+                  <p className="text-xs text-destructive">{field.state.meta.errors.join(", ")}</p>
+                )}
+              </div>
+            )}
+          </form.Field>
+
+          {/* Hidden/Read-only Coordinates Display (Optional for UX) */}
+          <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
+            <div>Lat: {form.state.values.latitude || "---"}</div>
+            <div>Lng: {form.state.values.longitude || "---"}</div>
+          </div>
+          {resolveError ? <p className="text-xs text-destructive">{resolveError}</p> : null}
+
+          {/* Cuisines Field */}
+          <form.Field name="cuisines">
+            {(field) => (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Cuisines</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={cuisineInput}
+                    onChange={(e) => setCuisineInput(e.target.value)}
+                    placeholder="Italian, Pizza..."
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && (e.preventDefault(), handleAddCuisine(field))
+                    }
+                  />
+                  <Button type="button" onClick={() => handleAddCuisine(field)}>
                     Add
                   </Button>
                 </div>
-                {field.state.value.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {field.state.value.map((cuisine) => (
-                      <Badge key={cuisine} variant="secondary" className="gap-1 pr-1">
-                        {cuisine}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCuisine(field, cuisine)}
-                          className="ml-0.5 rounded-full hover:bg-destructive/20 p-0.5"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {field.state.meta.errors.length > 0 && (
-                  <p className="text-[0.8rem] font-medium text-destructive">
-                    {field.state.meta.errors
-                      .map((e) =>
-                        typeof e === "object" && e !== null && "message" in e
-                          ? (e as { message: string }).message
-                          : String(e),
-                      )
-                      .join(", ")}
-                  </p>
-                )}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {field.state.value.map((c: string) => (
+                    <Badge key={c} variant="secondary" className="gap-1">
+                      {c}
+                      <X
+                        className="size-3 cursor-pointer"
+                        onClick={() =>
+                          field.handleChange(field.state.value.filter((i: string) => i !== c))
+                        }
+                      />
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
           </form.Field>
 
           <DialogFooter>
-            {serverError ? (
-              <p className="text-[0.8rem] font-medium text-destructive">{serverError}</p>
-            ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
+            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <form.Subscribe selector={(state) => [state.canSubmit]}>
